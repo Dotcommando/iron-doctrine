@@ -1,9 +1,9 @@
 # Iron Doctrine — Simulation Execution Kernel
 
-- Plan status: Active
+- Plan status: Complete
 - File: `plans/SIMULATION_EXECUTION_KERNEL.md`
 - Previous plan: None
-- Next plan: To be determined after completion
+- Next plan: Stage 2 — Players, Commands, and Groups Contract
 - Related general stage: `GENERAL_PLAN.md`, Stage 1
 
 ## Objective
@@ -843,7 +843,7 @@ If final verification reveals a defect, add a reproducing test before fixing it.
 
 ## Step 7 — End-to-End Verification and Plan Completion
 
-**Status:** Pending
+**Status:** Done
 
 ### Goal
 
@@ -903,3 +903,19 @@ Do not add tests solely to increase test count.
 - Every completed step has status `Done`.
 - Completion report lists changed files, checks, assumptions, and risks.
 - The next plan does not invent a robot model before purchased assets have been studied.
+
+### Done
+
+- Cleaned Docker Compose state with `docker compose -f docker-compose.yml down --volumes --remove-orphans`.
+- Built the development image from the repository with `docker compose -f docker-compose.yml build rust`.
+- Verified `rustc 1.97.1` inside Docker.
+- Verified `cargo 1.97.1` inside Docker.
+- Verified the complete quality gate with `docker compose -f docker-compose.yml run --rm rust sh scripts/check.sh`.
+- Ran `scenarios/empty-match.json` twice through `sim-cli` from Docker and confirmed the two JSON outputs match byte-for-byte.
+- Verified the valid scenario result has `finalTick` `3` and state hash `d1a599c4da0d1313ac4f850be89a66d83aafcd203c1961057200c4c3cc78503a`.
+- Verified trace order for each tick is `TickStarted`, `TickTransitionCalculated`, `TickTransitionApplied`, `StateHashCalculated`, and `TickCompleted`.
+- Verified an invalid scenario with tick rate `0` exits with a controlled non-zero result, writes no stdout, and reports `invalid tick rate` on stderr.
+- Verified `git status --short` after end-to-end checks.
+- Confirmed every completed step contains a factual `Done` section and every step status is `Done`.
+- Marked this plan status as `Complete`.
+- Identified the next plan subject as Stage 2, Players, Commands, and Groups Contract; it does not introduce the robot model before purchased assets have been studied.
