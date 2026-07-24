@@ -2,6 +2,9 @@
 
 use sim_protocol::MatchConfig;
 
+const AUTHORITATIVE_STATE_VERSION: u16 = 1;
+const STATE_HASH_ALGORITHM: &str = "BLAKE3-256";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MatchCreationError;
 
@@ -14,6 +17,7 @@ pub enum TickExecutionError {
 pub struct TickResult {
     started_tick: u64,
     completed_tick: u64,
+    state_hash: StateHash,
 }
 
 impl TickResult {
@@ -23,6 +27,72 @@ impl TickResult {
 
     pub const fn completed_tick(self) -> u64 {
         self.completed_tick
+    }
+
+    pub const fn state_hash(self) -> StateHash {
+        self.state_hash
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StateHash([u8; 32]);
+
+impl StateHash {
+    pub const fn algorithm(self) -> &'static str {
+        STATE_HASH_ALGORITHM
+    }
+
+    pub const fn bytes(self) -> [u8; 32] {
+        self.0
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TraceRecordKind {
+    TickStarted,
+    TickTransitionCalculated,
+    TickTransitionApplied,
+    StateHashCalculated,
+    TickCompleted,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TraceRecord {
+    tick: u64,
+    kind: TraceRecordKind,
+}
+
+impl TraceRecord {
+    pub const fn tick(&self) -> u64 {
+        self.tick
+    }
+
+    pub const fn kind(&self) -> TraceRecordKind {
+        self.kind
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ExecutionTrace {
+    records: Vec<TraceRecord>,
+}
+
+impl ExecutionTrace {
+    pub const fn new() -> Self {
+        Self {
+            records: Vec::new(),
+        }
+    }
+
+    pub fn records(&self) -> &[TraceRecord] {
+        &self.records
+    }
+
+    fn record(&mut self, tick: AuthoritativeTick, kind: TraceRecordKind) {
+        self.records.push(TraceRecord {
+            tick: tick.value(),
+            kind,
+        });
     }
 }
 
@@ -46,15 +116,48 @@ impl MatchSimulation {
         self.state.config
     }
 
+    pub fn state_hash(&self) -> StateHash {
+        self.state.hash()
+    }
+
     pub fn execute_tick(&mut self) -> Result<TickResult, TickExecutionError> {
+        self.execute_tick_with_trace(None)
+    }
+
+    pub fn execute_tick_with_trace(
+        &mut self,
+        trace: Option<&mut ExecutionTrace>,
+    ) -> Result<TickResult, TickExecutionError> {
+        let mut trace = trace;
         let started_tick = self.verify_next_tick_may_begin()?;
+        record_trace(&mut trace, started_tick, TraceRecordKind::TickStarted);
+
         let completed_tick = calculate_next_tick(started_tick)?;
+        record_trace(
+            &mut trace,
+            started_tick,
+            TraceRecordKind::TickTransitionCalculated,
+        );
 
         self.apply_tick_transition(completed_tick);
+        record_trace(
+            &mut trace,
+            completed_tick,
+            TraceRecordKind::TickTransitionApplied,
+        );
+
+        let state_hash = self.state_hash();
+        record_trace(
+            &mut trace,
+            completed_tick,
+            TraceRecordKind::StateHashCalculated,
+        );
+        record_trace(&mut trace, completed_tick, TraceRecordKind::TickCompleted);
 
         Ok(TickResult {
             started_tick: started_tick.value(),
             completed_tick: completed_tick.value(),
+            state_hash,
         })
     }
 
@@ -87,6 +190,16 @@ impl AuthoritativeState {
             current_tick: AuthoritativeTick::ZERO,
         }
     }
+
+    fn hash(self) -> StateHash {
+        let mut canonical = Vec::with_capacity(2 + 2 + 8 + 8);
+        canonical.extend_from_slice(&AUTHORITATIVE_STATE_VERSION.to_le_bytes());
+        canonical.extend_from_slice(&self.config.tick_rate_hz().to_le_bytes());
+        canonical.extend_from_slice(&self.config.seed().to_le_bytes());
+        canonical.extend_from_slice(&self.current_tick.value().to_le_bytes());
+
+        StateHash(*blake3::hash(&canonical).as_bytes())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -110,6 +223,16 @@ fn calculate_next_tick(
         .ok_or(TickExecutionError::TickLimitReached {
             current_tick: started_tick.value(),
         })
+}
+
+fn record_trace(
+    trace: &mut Option<&mut ExecutionTrace>,
+    tick: AuthoritativeTick,
+    kind: TraceRecordKind,
+) {
+    if let Some(trace) = trace.as_deref_mut() {
+        trace.record(tick, kind);
+    }
 }
 
 #[cfg(test)]
@@ -213,5 +336,103 @@ mod tests {
         let result = simulation.execute_tick();
 
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn identical_runs_produce_the_same_hash_after_every_tick() {
+        let mut first = MatchSimulation::new(match_config(123456))
+            .expect("validated configuration should create a simulation");
+        let mut second = MatchSimulation::new(match_config(123456))
+            .expect("validated configuration should create a simulation");
+
+        assert_eq!(first.state_hash(), second.state_hash());
+
+        for _ in 0..3 {
+            let first_result = first.execute_tick().expect("first tick should complete");
+            let second_result = second.execute_tick().expect("second tick should complete");
+
+            assert_eq!(first_result.state_hash(), second_result.state_hash());
+            assert_eq!(first.state_hash(), second.state_hash());
+        }
+    }
+
+    #[test]
+    fn different_seeds_produce_different_initial_hashes() {
+        let first = MatchSimulation::new(match_config(123456))
+            .expect("validated configuration should create a simulation");
+        let second = MatchSimulation::new(match_config(654321))
+            .expect("validated configuration should create a simulation");
+
+        assert_ne!(first.state_hash(), second.state_hash());
+    }
+
+    #[test]
+    fn different_tick_counts_produce_different_final_hashes() {
+        let mut one_tick = MatchSimulation::new(match_config(123456))
+            .expect("validated configuration should create a simulation");
+        let mut two_ticks = MatchSimulation::new(match_config(123456))
+            .expect("validated configuration should create a simulation");
+
+        one_tick.execute_tick().expect("tick 1 should complete");
+        two_ticks.execute_tick().expect("tick 1 should complete");
+        two_ticks.execute_tick().expect("tick 2 should complete");
+
+        assert_ne!(one_tick.state_hash(), two_ticks.state_hash());
+    }
+
+    #[test]
+    fn enabling_trace_does_not_change_the_hash() {
+        let mut without_trace = MatchSimulation::new(match_config(123456))
+            .expect("validated configuration should create a simulation");
+        let mut with_trace = MatchSimulation::new(match_config(123456))
+            .expect("validated configuration should create a simulation");
+        let mut trace = ExecutionTrace::new();
+
+        let without_trace_result = without_trace
+            .execute_tick()
+            .expect("tick without trace should complete");
+        let with_trace_result = with_trace
+            .execute_tick_with_trace(Some(&mut trace))
+            .expect("tick with trace should complete");
+
+        assert_eq!(
+            without_trace_result.state_hash(),
+            with_trace_result.state_hash()
+        );
+        assert_eq!(without_trace.state_hash(), with_trace.state_hash());
+    }
+
+    #[test]
+    fn trace_reflects_the_actual_execution_order() {
+        let mut simulation = MatchSimulation::new(match_config(123456))
+            .expect("validated configuration should create a simulation");
+        let mut trace = ExecutionTrace::new();
+
+        simulation
+            .execute_tick_with_trace(Some(&mut trace))
+            .expect("traced tick should complete");
+
+        let trace_kinds = trace
+            .records()
+            .iter()
+            .map(TraceRecord::kind)
+            .collect::<Vec<_>>();
+        let trace_ticks = trace
+            .records()
+            .iter()
+            .map(TraceRecord::tick)
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            trace_kinds,
+            vec![
+                TraceRecordKind::TickStarted,
+                TraceRecordKind::TickTransitionCalculated,
+                TraceRecordKind::TickTransitionApplied,
+                TraceRecordKind::StateHashCalculated,
+                TraceRecordKind::TickCompleted,
+            ]
+        );
+        assert_eq!(trace_ticks, vec![0, 0, 1, 1, 1]);
     }
 }

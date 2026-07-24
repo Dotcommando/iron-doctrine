@@ -9,4 +9,5 @@ publish.workspace = true
 path = "src/lib.rs"
 
 [dependencies]
+blake3 = "1"
 sim-protocol = { path = "../sim-protocol" }

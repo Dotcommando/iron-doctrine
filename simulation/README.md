@@ -36,3 +36,16 @@ docker compose -f docker-compose.yml run --rm rust cargo test --workspace --all-
   "trace": true
 }
 ```
+
+## State Hash and Trace
+
+`sim-core` calculates authoritative state hashes with BLAKE3-256, as recorded in `docs/decisions/ADR-0001-BLAKE3-STATE-HASH.md`.
+
+The first canonical state hash includes:
+
+- authoritative state version;
+- tick rate;
+- seed;
+- current authoritative tick.
+
+Execution trace records are structured diagnostics. They are not gameplay events and do not affect authoritative state hashes.

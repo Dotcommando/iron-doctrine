@@ -589,7 +589,7 @@ The last contract is enforced through the public API and type structure rather t
 
 ## Step 4 — Canonical State Hash and Structured Trace
 
-**Status:** Pending
+**Status:** Done
 
 ### Goal
 
@@ -645,6 +645,24 @@ Do not compare full trace text when trace record kinds and order are sufficient.
 - Trace is not called gameplay events.
 - All behavioural tests failed before implementation and now pass.
 - The full Rust quality gate passes.
+
+### Done
+
+- Added BLAKE3-256 state hashing in `sim-core` through one implementation over explicit canonical authoritative-state bytes.
+- Included authoritative state version, tick rate, seed, and current authoritative tick in the canonical hash input.
+- Excluded trace, errors, elapsed time, file paths, operating system details, Docker metadata, JSON ordering, and non-authoritative data from the hash.
+- Added `StateHash` and exposed hashes through `MatchSimulation::state_hash` and `TickResult::state_hash`.
+- Added structured `ExecutionTrace`, `TraceRecord`, and `TraceRecordKind` diagnostics.
+- Added optional trace collection through `MatchSimulation::execute_tick_with_trace`.
+- Updated tick execution order to record tick start, tick transition calculation, tick transition application, state hash calculation, and tick completion.
+- Added behavioural tests proving identical runs produce the same hash after every tick, different seeds produce different hashes, different tick counts produce different hashes, trace does not affect the hash, and trace order matches operations actually executed.
+- Added `docs/decisions/ADR-0001-BLAKE3-STATE-HASH.md` and indexed it in `docs/decisions/README.md`.
+- Updated `simulation/README.md` with the state hash and trace contract.
+- Verified the added tests failed before implementation and pass after implementation.
+- Verified `docker compose -f docker-compose.yml run --rm rust cargo fmt --check`.
+- Verified `docker compose -f docker-compose.yml run --rm rust cargo clippy --workspace --all-targets --all-features -- -D warnings`.
+- Verified `docker compose -f docker-compose.yml run --rm rust cargo test --workspace --all-targets --all-features`.
+- Reviewed Steps 5, 6, and 7; Step 6 was updated to account for ADR-0001 already recording the state hash algorithm.
 
 ---
 
@@ -754,7 +772,7 @@ Expected candidates:
 - the Rust core as the authoritative simulation used by the multiplayer server;
 - fixed-tick execution;
 - Docker as the canonical Rust development and verification environment;
-- state hash algorithm, if it becomes a long-term external contract.
+- additional state hash decisions only if they supersede or materially extend `ADR-0001-BLAKE3-STATE-HASH.md`.
 
 Do not automatically create an ADR for every candidate.
 

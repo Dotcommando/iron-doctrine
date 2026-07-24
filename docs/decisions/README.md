@@ -4,6 +4,10 @@ This directory contains Architecture Decision Records, or ADRs, for Iron Doctrin
 
 An ADR records an important architectural or technical decision together with its context, consequences, and alternatives.
 
+## Index
+
+- [ADR-0001: BLAKE3 State Hash](ADR-0001-BLAKE3-STATE-HASH.md)
+
 ## When to Create an ADR
 
 Create an ADR when a decision:
