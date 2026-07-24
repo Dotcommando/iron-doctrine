@@ -82,6 +82,9 @@ version = "0.1.0"
 [[package]]
 name = "sim-core"
 version = "0.1.0"
+dependencies = [
+ "sim-protocol",
+]
 
 [[package]]
 name = "sim-protocol"

@@ -513,7 +513,7 @@ Do not test every individual serde field when one whole-contract test is suffici
 
 ## Step 3 — Deterministic Kernel and Fixed Tick
 
-**Status:** Pending
+**Status:** Done
 
 ### Goal
 
@@ -568,6 +568,22 @@ The last contract is enforced through the public API and type structure rather t
 - No hidden global state exists.
 - All behavioural tests failed before implementation and now pass.
 - The full Rust quality gate passes.
+
+### Done
+
+- Added `sim-core` dependency on `sim-protocol` so `MatchSimulation` is created from validated `MatchConfig`.
+- Added first-stage authoritative state containing the validated match configuration and current authoritative tick.
+- Added `MatchSimulation::new`, `current_tick`, `match_config`, and `execute_tick`.
+- Added `TickResult` with started and completed tick numbers.
+- Added structured `MatchCreationError` and `TickExecutionError` types, including controlled failure for tick overflow.
+- Implemented the fixed tick pipeline as verify next tick, calculate next tick, apply tick transition, and produce the tick result.
+- Kept the public tick execution operation free of commands, `deltaTime`, wall-clock input, async, threads, ECS, phase registries, event buses, placeholder phases, and global mutable state.
+- Added behavioural tests proving a new simulation starts at tick `0`, one tick completes tick `1`, three ticks complete tick `3`, identical configurations follow the same tick sequence, and tick execution requires no time input.
+- Verified the added tests failed before implementation and pass after implementation.
+- Verified `docker compose -f docker-compose.yml run --rm rust cargo fmt --check`.
+- Verified `docker compose -f docker-compose.yml run --rm rust cargo clippy --workspace --all-targets --all-features -- -D warnings`.
+- Verified `docker compose -f docker-compose.yml run --rm rust cargo test --workspace --all-targets --all-features`.
+- Reviewed Steps 4, 5, and 6; their names, paths, assumptions, dependencies, and expected outputs still match the implemented kernel API.
 
 ---
 
