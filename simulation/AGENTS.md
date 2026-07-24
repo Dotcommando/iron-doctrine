@@ -7,7 +7,7 @@ These rules apply to the Rust simulation workspace under `simulation/`.
 ## Rust Environment
 
 - Use the pinned Rust toolchain in `rust-toolchain.toml`.
-- Prefer Docker Compose commands from `simulation/README.md` for verification.
+- Use `docker compose -f docker-compose.yml run --rm rust sh scripts/check.sh` as the full Rust quality gate.
 - Do not require host Rust for routine build, lint, or test workflows.
 - Keep Docker configuration free of user-specific absolute paths.
 

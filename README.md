@@ -95,6 +95,8 @@ Documentation, plans, identifiers, comments, and commit messages are written in 
 
 ## Current Status
 
-The repository is being bootstrapped.
+The Rust simulation workspace is being implemented through `plans/SIMULATION_EXECUTION_KERNEL.md`.
 
-Architecture, contracts, tools, and implementation structure will be introduced incrementally through reviewed plans rather than created speculatively in advance.
+The repository currently contains a Docker-based Rust workspace, versioned headless scenario input, a deterministic empty-match kernel, canonical state hashing, structured execution trace, and a headless CLI scenario runner.
+
+Further architecture, gameplay contracts, tools, and implementation structure will continue to be introduced incrementally through reviewed plans rather than created speculatively in advance.

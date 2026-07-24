@@ -16,11 +16,22 @@ docker compose -f docker-compose.yml run --rm rust rustc --version
 docker compose -f docker-compose.yml run --rm rust cargo --version
 docker compose -f docker-compose.yml run --rm rust cargo metadata --no-deps --format-version 1
 docker compose -f docker-compose.yml run --rm rust cargo check --workspace --all-targets
-docker compose -f docker-compose.yml run --rm rust cargo fmt --check
-docker compose -f docker-compose.yml run --rm rust cargo clippy --workspace --all-targets --all-features -- -D warnings
-docker compose -f docker-compose.yml run --rm rust cargo test --workspace --all-targets --all-features
 docker compose -f docker-compose.yml run --rm rust cargo run -p sim-cli -- run ../scenarios/empty-match.json
 ```
+
+## Quality Gate
+
+Run the full Rust quality gate from this `simulation/` directory:
+
+```powershell
+docker compose -f docker-compose.yml run --rm rust sh scripts/check.sh
+```
+
+The script runs:
+
+1. `cargo fmt --check`
+2. `cargo clippy --workspace --all-targets --all-features -- -D warnings`
+3. `cargo test --workspace --all-targets --all-features`
 
 ## Headless Scenario Input
 

@@ -7,6 +7,9 @@ An ADR records an important architectural or technical decision together with it
 ## Index
 
 - [ADR-0001: BLAKE3 State Hash](ADR-0001-BLAKE3-STATE-HASH.md)
+- [ADR-0002: Rust Authoritative Simulation](ADR-0002-RUST-AUTHORITATIVE-SIMULATION.md)
+- [ADR-0003: Fixed Simulation Tick](ADR-0003-FIXED-SIMULATION-TICK.md)
+- [ADR-0004: Docker Rust Development Environment](ADR-0004-DOCKER-RUST-DEVELOPMENT-ENVIRONMENT.md)
 
 ## When to Create an ADR
 

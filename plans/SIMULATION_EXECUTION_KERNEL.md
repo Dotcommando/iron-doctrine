@@ -758,7 +758,7 @@ Tests must verify meaningful JSON fields rather than whitespace and formatting.
 
 ## Step 6 — Single Quality Gate and Recorded Decisions
 
-**Status:** Pending
+**Status:** Done
 
 ### Goal
 
@@ -823,6 +823,22 @@ If final verification reveals a defect, add a reproducing test before fixing it.
 - No generated build output, IDE cache, or secrets are tracked.
 - `git status` contains only expected changes.
 
+### Done
+
+- Added `simulation/scripts/check.sh` as the single Rust quality gate script.
+- The quality gate runs `cargo fmt --check`, `cargo clippy --workspace --all-targets --all-features -- -D warnings`, and `cargo test --workspace --all-targets --all-features` in order.
+- Documented the single Docker quality gate command: `docker compose -f docker-compose.yml run --rm rust sh scripts/check.sh`.
+- Updated `simulation/AGENTS.md` to direct agents to the single Rust quality gate.
+- Updated `simulation/README.md` with the verified quality gate command and removed the separate formatting, clippy, and test commands as equivalent documented entry points.
+- Updated the root `README.md` current status to reflect the implemented Rust workspace, scenario contract, empty-match kernel, state hash, trace, and CLI runner.
+- Added `docs/decisions/ADR-0002-RUST-AUTHORITATIVE-SIMULATION.md`.
+- Added `docs/decisions/ADR-0003-FIXED-SIMULATION-TICK.md`.
+- Added `docs/decisions/ADR-0004-DOCKER-RUST-DEVELOPMENT-ENVIRONMENT.md`.
+- Updated `docs/decisions/README.md` to index all accepted ADRs.
+- Left `docs/GLOSSARY.md` empty because no real terminology ambiguity appeared.
+- Verified `docker compose -f docker-compose.yml run --rm rust sh scripts/check.sh`.
+- Reviewed Step 7; its names, paths, assumptions, dependencies, and expected outputs still match the implemented stage pipeline.
+
 ---
 
 ## Step 7 — End-to-End Verification and Plan Completion
@@ -839,7 +855,7 @@ From a clean Docker state, execute:
 
 1. development image build;
 2. Rust toolchain verification;
-3. complete quality gate;
+3. complete quality gate with `docker compose -f docker-compose.yml run --rm rust sh scripts/check.sh`;
 4. `scenarios/empty-match.json`;
 5. the same scenario a second time;
 6. an invalid scenario;
