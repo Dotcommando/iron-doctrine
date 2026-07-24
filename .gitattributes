@@ -1,0 +1,98 @@
+# Normalize text files across Windows and macOS.
+* text=auto eol=lf
+
+# Windows-native scripts.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Explicitly keep source, configuration, and Unity text assets as LF.
+*.rs text eol=lf
+*.cs text eol=lf
+*.shader text eol=lf
+*.compute text eol=lf
+*.cginc text eol=lf
+*.hlsl text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.json text eol=lf
+*.jsonc text eol=lf
+*.toml text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.xml text eol=lf
+*.props text eol=lf
+*.targets text eol=lf
+*.csproj text eol=lf
+*.sln text eol=lf
+*.editorconfig text eol=lf
+*.gitignore text eol=lf
+*.gitattributes text eol=lf
+*.meta text eol=lf
+*.unity text eol=lf
+*.prefab text eol=lf
+*.asset text eol=lf
+*.mat text eol=lf
+*.anim text eol=lf
+*.controller text eol=lf
+*.overrideController text eol=lf
+*.playable text eol=lf
+*.asmdef text eol=lf
+*.asmref text eol=lf
+*.inputactions text eol=lf
+
+# Binary files.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.bmp binary
+*.tga binary
+*.tif binary
+*.tiff binary
+*.psd binary
+*.exr binary
+*.hdr binary
+*.webp binary
+*.ico binary
+
+*.fbx binary
+*.obj binary
+*.blend binary
+*.dae binary
+*.3ds binary
+
+*.wav binary
+*.mp3 binary
+*.ogg binary
+*.flac binary
+*.aiff binary
+*.aif binary
+
+*.mp4 binary
+*.mov binary
+*.avi binary
+*.webm binary
+
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+
+*.dll binary
+*.so binary
+*.dylib binary
+*.exe binary
+*.pdb binary
+*.mdb binary
+
+*.zip binary
+*.7z binary
+*.rar binary
+*.tar binary
+*.gz binary
+*.bz2 binary
+*.xz binary
+*.unitypackage binary
+
+# Git LFS can be introduced later for large assets when needed.
