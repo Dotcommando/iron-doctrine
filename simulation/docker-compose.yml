@@ -1,0 +1,20 @@
+services:
+  rust:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        RUST_VERSION: "1.97.1"
+    working_dir: /workspace/simulation
+    volumes:
+      - ..:/workspace
+      - cargo-registry:/usr/local/cargo/registry
+      - cargo-git:/usr/local/cargo/git
+      - cargo-target:/workspace/simulation/target
+    environment:
+      CARGO_HOME: /usr/local/cargo
+
+volumes:
+  cargo-registry:
+  cargo-git:
+  cargo-target:

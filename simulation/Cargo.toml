@@ -1,0 +1,12 @@
+[workspace]
+members = [
+    "crates/sim-protocol",
+    "crates/sim-core",
+    "apps/sim-cli",
+]
+resolver = "3"
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.97.1"
+publish = false

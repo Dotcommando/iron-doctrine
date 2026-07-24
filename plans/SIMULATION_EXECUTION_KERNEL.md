@@ -157,7 +157,7 @@ simulation/
 ├── Cargo.lock
 ├── rust-toolchain.toml
 ├── Dockerfile
-├── compose.yaml
+├── docker-compose.yml
 ├── .dockerignore
 ├── README.md
 ├── AGENTS.md
@@ -364,7 +364,7 @@ Every test must protect a meaningful contract.
 
 ## Step 1 — Rust Environment and Cargo Workspace
 
-**Status:** Pending
+**Status:** Done
 
 ### Goal
 
@@ -413,6 +413,21 @@ Verification is performed through build commands.
 - `simulation/README.md` contains only verified commands.
 - No `target/`, IDE cache, or Docker-generated garbage is tracked.
 - No unnecessary crates or dependencies are added.
+
+### Done
+
+- Added `simulation/rust-toolchain.toml` pinned to Rust `1.97.1`.
+- Added `simulation/Dockerfile` based on the official Rust image and `simulation/docker-compose.yml` with `RUST_VERSION: "1.97.1"` and no Compose `version` field.
+- Mounted the repository root into the container at `/workspace`, kept Cargo registry, Git cache, and build output in Docker volumes, and kept the Cargo working directory at `/workspace/simulation`.
+- Created the Cargo workspace with `sim-protocol`, `sim-core`, and `sim-cli` manifests and minimal compilable entry points without gameplay logic.
+- Added `simulation/README.md` with verified Docker Compose commands and `simulation/AGENTS.md` with Rust-specific rules.
+- Generated `simulation/Cargo.lock` through the verified Cargo workflow.
+- Verified `docker compose -f docker-compose.yml build rust`.
+- Verified `rustc 1.97.1` and `cargo 1.97.1` inside the container.
+- Verified Cargo metadata lists exactly `sim-protocol`, `sim-core`, and `sim-cli`.
+- Verified `cargo check --workspace --all-targets` inside Docker and repeated it to confirm the build cache persists.
+- Verified a file created by the container in `simulation/` is visible and removable from Windows.
+- Reviewed Steps 2, 3, and 4; their names, paths, symbols, assumptions, dependencies, and expected outputs still match the implemented workspace.
 
 ---
 
