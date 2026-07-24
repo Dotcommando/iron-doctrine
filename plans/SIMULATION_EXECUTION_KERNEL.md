@@ -433,7 +433,7 @@ Verification is performed through build commands.
 
 ## Step 2 — Configuration and Headless Scenario Formats
 
-**Status:** Pending
+**Status:** Done
 
 ### Goal
 
@@ -493,6 +493,21 @@ Do not test every individual serde field when one whole-contract test is suffici
 - `cargo fmt --check` passes.
 - `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes.
 - `cargo test --workspace --all-targets --all-features` passes.
+
+### Done
+
+- Added `sim-protocol` input contracts for `SchemaVersion`, `TickRateHz`, `Seed`, `RunTicks`, `MatchConfig`, and `HeadlessScenario`.
+- Added private raw JSON DTOs so external JSON shape is separated from validated protocol types.
+- Added `parse_headless_scenario_json`, which maps malformed or shape-invalid JSON to `ScenarioInputError::DataShape` and maps validation failures to `ScenarioInputError::Validation`.
+- Added structured validation errors for unsupported schema version, invalid tick rate, and invalid tick count.
+- Added behavioural tests proving valid scenarios are accepted, unsupported schema versions are rejected, invalid tick rates are rejected, invalid tick counts are rejected, and seeds are preserved without modification.
+- Added `serde` and `serde_json` only where needed by `sim-protocol`.
+- Updated `simulation/README.md` with the verified Rust check commands and the supported headless scenario input shape.
+- Verified the added tests failed before implementation and pass after implementation.
+- Verified `docker compose -f docker-compose.yml run --rm rust cargo fmt --check`.
+- Verified `docker compose -f docker-compose.yml run --rm rust cargo clippy --workspace --all-targets --all-features -- -D warnings`.
+- Verified `docker compose -f docker-compose.yml run --rm rust cargo test --workspace --all-targets --all-features`.
+- Reviewed Steps 3, 4, and 5; their names, paths, assumptions, dependencies, and expected outputs still match the implemented protocol contracts.
 
 ---
 
