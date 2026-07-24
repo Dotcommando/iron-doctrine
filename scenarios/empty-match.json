@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "match": {
+    "tickRateHz": 20,
+    "seed": 123456
+  },
+  "runTicks": 3,
+  "trace": true
+}

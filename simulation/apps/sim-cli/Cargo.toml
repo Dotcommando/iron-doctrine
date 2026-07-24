@@ -8,3 +8,9 @@ publish.workspace = true
 [[bin]]
 name = "sim-cli"
 path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sim-core = { path = "../../crates/sim-core" }
+sim-protocol = { path = "../../crates/sim-protocol" }

@@ -19,6 +19,7 @@ docker compose -f docker-compose.yml run --rm rust cargo check --workspace --all
 docker compose -f docker-compose.yml run --rm rust cargo fmt --check
 docker compose -f docker-compose.yml run --rm rust cargo clippy --workspace --all-targets --all-features -- -D warnings
 docker compose -f docker-compose.yml run --rm rust cargo test --workspace --all-targets --all-features
+docker compose -f docker-compose.yml run --rm rust cargo run -p sim-cli -- run ../scenarios/empty-match.json
 ```
 
 ## Headless Scenario Input
@@ -49,3 +50,16 @@ The first canonical state hash includes:
 - current authoritative tick.
 
 Execution trace records are structured diagnostics. They are not gameplay events and do not affect authoritative state hashes.
+
+## Headless CLI Output
+
+`sim-cli run` writes successful results to stdout as JSON with:
+
+- `schemaVersion`;
+- `initialTick`;
+- `completedTicks`;
+- `finalTick`;
+- `stateHash`;
+- `trace` when requested by the scenario.
+
+Error diagnostics are written to stderr, and failures exit with a non-zero status.

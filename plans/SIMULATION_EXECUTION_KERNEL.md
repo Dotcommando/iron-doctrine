@@ -50,7 +50,7 @@ The repository must be able to execute a scenario with the following meaning:
 Example command:
 
 ```powershell
-docker compose run --rm rust cargo run -p sim-cli -- run scenarios/empty-match.json
+docker compose -f docker-compose.yml run --rm rust cargo run -p sim-cli -- run ../scenarios/empty-match.json
 ```
 
 The exact Docker Compose service name and CLI syntax may be refined during implementation.
@@ -668,7 +668,7 @@ Do not compare full trace text when trace record kinds and order are sufficient.
 
 ## Step 5 — Headless CLI and End-to-End Scenario
 
-**Status:** Pending
+**Status:** Done
 
 ### Goal
 
@@ -734,6 +734,25 @@ Tests must verify meaningful JSON fields rather than whitespace and formatting.
 - CLI contains no duplicated gameplay logic.
 - All integration tests failed before implementation and now pass.
 - The full Rust quality gate passes.
+
+### Done
+
+- Added `scenarios/empty-match.json` with schema version `1`, tick rate `20`, seed `123456`, `runTicks` `3`, and trace enabled.
+- Implemented `sim-cli run <scenario-path>` as the headless CLI entry point.
+- Kept filesystem reading, argument handling, stdout JSON writing, stderr diagnostics, and exit status handling in `sim-cli`.
+- Reused `sim-protocol` for JSON deserialization and validation instead of duplicating validation in the CLI.
+- Reused `sim-core` for match creation, tick execution, state hashing, and trace creation instead of duplicating lifecycle or simulation logic in the CLI.
+- Added JSON run output containing `schemaVersion`, `initialTick`, `completedTicks`, `finalTick`, `stateHash`, and `trace` when requested.
+- Added integration tests proving `empty-match.json` executes three ticks, repeated execution returns the same hash, invalid configuration fails, successful stdout is valid JSON, and errors are not mixed into successful JSON output.
+- Updated `simulation/README.md` with the verified CLI run command and output contract.
+- Updated the plan runnable command to `docker compose -f docker-compose.yml run --rm rust cargo run -p sim-cli -- run ../scenarios/empty-match.json`.
+- Verified the added integration tests failed before implementation and pass after implementation.
+- Verified `docker compose -f docker-compose.yml run --rm rust cargo run -p sim-cli -- run ../scenarios/empty-match.json`.
+- Verified an invalid scenario returns a non-zero exit code and writes diagnostics to stderr.
+- Verified `docker compose -f docker-compose.yml run --rm rust cargo fmt --check`.
+- Verified `docker compose -f docker-compose.yml run --rm rust cargo clippy --workspace --all-targets --all-features -- -D warnings`.
+- Verified `docker compose -f docker-compose.yml run --rm rust cargo test --workspace --all-targets --all-features`.
+- Reviewed Steps 6 and 7; their names, paths, assumptions, dependencies, and expected outputs still match the implemented CLI pipeline.
 
 ---
 
