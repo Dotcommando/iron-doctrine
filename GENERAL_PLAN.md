@@ -254,6 +254,39 @@ An event is a fact in the game world.
 
 Trace and Event must remain separate concepts.
 
+## Gameplay Hypothesis Validation
+
+Gameplay behaviour that determines player interaction must not be treated as final merely because it is required to build an early executable scenario.
+
+Early group orders, autonomy rules, targeting behaviour, and tactical reactions are hypotheses until they have been exercised in a playable prototype.
+
+When a gameplay concept can reasonably be validated through a cheap prototype, prefer validating it before building production content or generalized architecture around it.
+
+Prototype code must still respect:
+
+- the authoritative Rust simulation boundary;
+- determinism;
+- fixed ticks;
+- explicit execution order;
+- hexagonal architecture.
+
+A prototype may use temporary gameplay rules and temporary presentation, but it must not introduce a temporary architectural path that will later replace the authoritative Rust core.
+
+Candidate commands introduced for prototype evaluation are not permanent public contracts merely because they exist in a working build.
+
+Prefer the smallest command set that makes the relevant gameplay question testable.
+
+The intended interaction model is:
+
+- the player expresses group-level intent;
+- robots handle local execution details wherever practical;
+- the player is not expected to micromanage individual robots;
+- choosing not to intervene must remain a valid tactical decision.
+
+The target is not one mandatory player action every approximately eight seconds.
+
+The target is that changing battle state creates opportunities for meaningful player decisions at roughly that cadence while still allowing deliberate periods of inactivity.
+
 ## Rust Project Structure
 
 The structure is created incrementally as real responsibilities appear.
@@ -440,6 +473,10 @@ Only mechanics required by this vertical slice are introduced:
 
 A physics library is added only after the exact queries it must solve have been defined.
 
+The group orders used to make this stage executable are not automatically considered the final tactical command model.
+
+They are sufficient to exercise the combat pipeline and become candidates for later prototype validation.
+
 ## Stage 7 — Unity and Rust Integration
 
 The Unity project is created after Rust can independently execute a complete simple battle.
@@ -461,7 +498,62 @@ The initial integration may use primitives instead of commercial models.
 
 Gameplay rules are not moved into Unity to simplify integration.
 
-## Stage 8 — Game Asset Pipeline
+## Stage 8 — Tactical Combat Prototype
+
+Create a deliberately rough playable combat sandbox for validating the player's group-command model before production gameplay systems and asset integration are expanded.
+
+The purpose of this stage is not visual quality or content production.
+
+The prototype must answer:
+
+- which decisions are interesting at group level;
+- how often the player wants or needs to intervene;
+- which decisions robots should make autonomously;
+- which group orders are meaningfully different from each other;
+- which orders are redundant;
+- which missing orders repeatedly arise during play;
+- whether a player can intentionally remain inactive for several seconds without losing control of the battle;
+- whether multiple groups create useful command-level decisions rather than excessive micromanagement.
+
+The prototype uses simple geometry and temporary presentation.
+
+Candidate orders are hypotheses, not permanent public contracts.
+
+Start with the smallest useful command set and change it through playtesting.
+
+Possible experimental orders include:
+
+- move;
+- hold;
+- assault;
+- probe;
+- withdraw.
+
+These names and semantics are not accepted gameplay decisions merely because they appear in this plan.
+
+Robot autonomy must handle local execution details wherever practical.
+
+The player should primarily express group-level intent rather than repeatedly control individual robot behaviour.
+
+The target is not one mandatory player action every approximately eight seconds.
+
+The target is that battle state creates opportunities for meaningful decisions at roughly that cadence.
+
+Choosing not to intervene must remain a valid decision.
+
+Stage result:
+
+- playable battles using primitive presentation;
+- at least two independently controlled groups per side;
+- several experimental group-level orders;
+- observable current group intent and relevant tactical state;
+- repeated manual playtesting;
+- removal or merging of redundant orders;
+- identification of missing high-value decisions;
+- documented conclusions about the next command model;
+- no requirement to preserve prototype command semantics that failed testing.
+
+## Stage 9 — Game Asset Pipeline
 
 Stage result:
 
@@ -477,7 +569,7 @@ Stage result:
 
 The system is built around assets that are actually purchased and used.
 
-## Stage 9 — Replays and Battle Branching
+## Stage 10 — Replays and Battle Branching
 
 Stage result:
 
@@ -498,7 +590,7 @@ Stage result:
 
 A replay is repeated execution of the authoritative simulation, not a video recording.
 
-## Stage 10 — Built-In Game AI
+## Stage 11 — Built-In Game AI
 
 Stage result:
 
@@ -513,7 +605,7 @@ Stage result:
 
 AI does not receive special commands unavailable to a human player.
 
-## Stage 11 — Performance and Match Scale
+## Stage 12 — Performance and Match Scale
 
 Target upper bound for a primary match:
 
@@ -536,7 +628,7 @@ Stage result:
 
 Only measured bottlenecks are optimized.
 
-## Stage 12 — Desktop Single-Player Game
+## Stage 13 — Desktop Single-Player Game
 
 The stage result is a complete working product.
 
@@ -558,7 +650,7 @@ Required gameplay loop:
 
 Exact content depends on purchased assets and the quality of implemented systems.
 
-## Stage 13 — Battle Library and Replay Progression
+## Stage 14 — Battle Library and Replay Progression
 
 Stage result:
 
@@ -571,7 +663,7 @@ Stage result:
 - protection against meaningless farming;
 - replay video export.
 
-## Stage 14 — LLM Commanders
+## Stage 15 — LLM Commanders
 
 Stage result:
 
@@ -589,7 +681,7 @@ Stage result:
 
 Built-in game AI remains mandatory and does not depend on external LLM availability.
 
-## Stage 15 — Multiplayer Infrastructure
+## Stage 16 — Multiplayer Infrastructure
 
 Stage result:
 
@@ -626,6 +718,13 @@ Every active plan must:
 - review the next three pending steps after every completed step;
 - update future names and paths to match the actual implementation;
 - preserve completed steps as historical records.
+
+Gameplay-focused active plans must also distinguish between:
+
+- behaviour required to make an executable experiment possible;
+- behaviour already validated as part of the intended player experience.
+
+Do not turn an experimental command, autonomy rule, or tactical behaviour into a permanent generalized abstraction before prototype evidence justifies it.
 
 ## Documentation
 
