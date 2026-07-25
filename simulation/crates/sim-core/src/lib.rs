@@ -1,6 +1,8 @@
 #![forbid(unsafe_code)]
 
-use sim_protocol::MatchConfig;
+pub use sim_protocol::{CommandRejectionReason, CommandResult, CommandResultStatus};
+
+use sim_protocol::{CommandEnvelope, CommandPayload, GroupId, GroupOrder, MatchConfig};
 
 const AUTHORITATIVE_STATE_VERSION: u16 = 1;
 const STATE_HASH_ALGORITHM: &str = "BLAKE3-256";
@@ -120,6 +122,10 @@ impl MatchSimulation {
         self.state.hash()
     }
 
+    pub fn validate_command(&self, command: &CommandEnvelope) -> CommandResult {
+        self.validate_command_for_intent(command).result
+    }
+
     pub fn execute_tick(&mut self) -> Result<TickResult, TickExecutionError> {
         self.execute_tick_with_trace(None)
     }
@@ -175,6 +181,102 @@ impl MatchSimulation {
     fn apply_tick_transition(&mut self, completed_tick: AuthoritativeTick) {
         self.state.current_tick = completed_tick;
     }
+
+    fn validate_command_for_intent(&self, command: &CommandEnvelope) -> CommandValidationOutcome {
+        if command.target_tick().value() != self.current_tick() {
+            return self.reject_command(command, CommandRejectionReason::WrongTargetTick);
+        }
+
+        if !self
+            .state
+            .config
+            .participants()
+            .iter()
+            .any(|participant| participant.participant_id() == command.participant_id())
+        {
+            return self.reject_command(command, CommandRejectionReason::UnknownParticipant);
+        }
+
+        match command.payload() {
+            CommandPayload::IssueGroupOrder(command_payload) => {
+                let Some(group) = self
+                    .state
+                    .config
+                    .groups()
+                    .iter()
+                    .find(|group| group.group_id() == command_payload.group_id())
+                else {
+                    return self.reject_command(command, CommandRejectionReason::UnknownGroup);
+                };
+
+                if group.controller_participant_id() != command.participant_id() {
+                    return self.reject_command(
+                        command,
+                        CommandRejectionReason::GroupNotControlledByParticipant,
+                    );
+                }
+
+                self.accept_command(
+                    command,
+                    CommandIntent::IssueGroupOrder(GroupOrderIntent {
+                        group_id: command_payload.group_id().clone(),
+                        order: command_payload.order(),
+                    }),
+                )
+            }
+        }
+    }
+
+    fn accept_command(
+        &self,
+        command: &CommandEnvelope,
+        intent: CommandIntent,
+    ) -> CommandValidationOutcome {
+        CommandValidationOutcome {
+            result: command_validation_result(command, CommandResultStatus::Accepted),
+            intent: Some(intent),
+        }
+    }
+
+    fn reject_command(
+        &self,
+        command: &CommandEnvelope,
+        reason: CommandRejectionReason,
+    ) -> CommandValidationOutcome {
+        CommandValidationOutcome {
+            result: command_validation_result(command, CommandResultStatus::Rejected { reason }),
+            intent: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CommandValidationOutcome {
+    result: CommandResult,
+    intent: Option<CommandIntent>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum CommandIntent {
+    IssueGroupOrder(GroupOrderIntent),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct GroupOrderIntent {
+    group_id: GroupId,
+    order: GroupOrder,
+}
+
+fn command_validation_result(
+    command: &CommandEnvelope,
+    status: CommandResultStatus,
+) -> CommandResult {
+    CommandResult::new(
+        command.sequence(),
+        command.target_tick(),
+        command.participant_id().clone(),
+        status,
+    )
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -283,8 +385,9 @@ fn record_trace(
 mod tests {
     use super::*;
     use sim_protocol::{
-        GroupConfig, GroupId, MatchConfig, MatchId, ParticipantConfig, ParticipantId, RobotId,
-        Seed, TeamConfig, TeamId, TickRateHz,
+        CommandEnvelope, CommandPayload, CommandSequence, GroupConfig, GroupId, GroupOrder,
+        IssueGroupOrder, MatchConfig, MatchId, ParticipantConfig, ParticipantId, RobotId, Seed,
+        TargetTick, TeamConfig, TeamId, TickRateHz,
     };
 
     fn id_match(value: &str) -> MatchId {
@@ -377,6 +480,23 @@ mod tests {
         .expect("valid reordered roster should pass validation")
     }
 
+    fn group_order_command(
+        sequence: u64,
+        target_tick: u64,
+        participant_id: ParticipantId,
+        group_id: GroupId,
+    ) -> CommandEnvelope {
+        CommandEnvelope::new(
+            CommandSequence::new(sequence),
+            TargetTick::new(target_tick),
+            participant_id,
+            CommandPayload::IssueGroupOrder(IssueGroupOrder::new(
+                group_id,
+                GroupOrder::HoldPosition,
+            )),
+        )
+    }
+
     #[test]
     fn new_simulation_starts_at_tick_zero() {
         let simulation = MatchSimulation::new(match_config(123456))
@@ -392,6 +512,117 @@ mod tests {
 
         assert_eq!(simulation.current_tick(), 0);
         assert_eq!(simulation.match_config().match_id().value(), "match-001");
+    }
+
+    #[test]
+    fn participant_may_issue_hold_position_to_a_group_they_control() {
+        let simulation = MatchSimulation::new(populated_match_config())
+            .expect("validated roster should create a simulation");
+        let command = group_order_command(
+            1,
+            0,
+            id_participant("participant-blue-1"),
+            id_group("group-blue-alpha"),
+        );
+
+        let validation = simulation.validate_command_for_intent(&command);
+
+        assert_eq!(validation.result.status(), CommandResultStatus::Accepted);
+        assert_eq!(
+            validation.intent,
+            Some(CommandIntent::IssueGroupOrder(GroupOrderIntent {
+                group_id: id_group("group-blue-alpha"),
+                order: GroupOrder::HoldPosition,
+            }))
+        );
+    }
+
+    #[test]
+    fn command_for_unknown_participant_is_rejected() {
+        let simulation = MatchSimulation::new(populated_match_config())
+            .expect("validated roster should create a simulation");
+        let command = group_order_command(
+            1,
+            0,
+            id_participant("participant-green-1"),
+            id_group("group-blue-alpha"),
+        );
+
+        let validation = simulation.validate_command_for_intent(&command);
+
+        assert_eq!(
+            validation.result.status(),
+            CommandResultStatus::Rejected {
+                reason: CommandRejectionReason::UnknownParticipant,
+            }
+        );
+        assert_eq!(validation.intent, None);
+    }
+
+    #[test]
+    fn command_for_unknown_group_is_rejected() {
+        let simulation = MatchSimulation::new(populated_match_config())
+            .expect("validated roster should create a simulation");
+        let command = group_order_command(
+            1,
+            0,
+            id_participant("participant-blue-1"),
+            id_group("group-blue-missing"),
+        );
+
+        let validation = simulation.validate_command_for_intent(&command);
+
+        assert_eq!(
+            validation.result.status(),
+            CommandResultStatus::Rejected {
+                reason: CommandRejectionReason::UnknownGroup,
+            }
+        );
+        assert_eq!(validation.intent, None);
+    }
+
+    #[test]
+    fn participant_commanding_another_participants_group_is_rejected() {
+        let simulation = MatchSimulation::new(populated_match_config())
+            .expect("validated roster should create a simulation");
+        let command = group_order_command(
+            1,
+            0,
+            id_participant("participant-blue-1"),
+            id_group("group-red-alpha"),
+        );
+
+        let validation = simulation.validate_command_for_intent(&command);
+
+        assert_eq!(
+            validation.result.status(),
+            CommandResultStatus::Rejected {
+                reason: CommandRejectionReason::GroupNotControlledByParticipant,
+            }
+        );
+        assert_eq!(validation.intent, None);
+    }
+
+    #[test]
+    fn command_assigned_to_a_different_tick_is_rejected() {
+        let simulation = MatchSimulation::new(populated_match_config())
+            .expect("validated roster should create a simulation");
+        let command = group_order_command(
+            1,
+            1,
+            id_participant("participant-blue-1"),
+            id_group("group-blue-alpha"),
+        );
+
+        let validation = simulation.validate_command_for_intent(&command);
+
+        assert_eq!(
+            validation.result.status(),
+            CommandResultStatus::Rejected {
+                reason: CommandRejectionReason::WrongTargetTick,
+            }
+        );
+        assert_eq!(validation.intent, None);
     }
 
     #[test]

@@ -831,7 +831,7 @@ Add additional tests only when needed to distinguish materially different valida
 
 ## Step 2 — First Group Command and Command Envelope
 
-**Status:** Pending
+**Status:** Done
 
 ### Goal
 
@@ -900,6 +900,18 @@ Do not test JSON formatting details when whole-contract protocol tests already p
 - Necessary ADRs describe implemented decisions only.
 - All added tests failed before implementation and now pass.
 - The full Rust quality gate passes.
+
+### Done
+
+- Added `CommandSequence`, `TargetTick`, `CommandEnvelope`, `CommandPayload`, `IssueGroupOrder`, and `GroupOrder::HoldPosition` to `sim-protocol`.
+- Added public `CommandResult`, `CommandResultStatus`, and structured `CommandRejectionReason` values.
+- Added `MatchSimulation::validate_command` for public command validation results without mutating authoritative state.
+- Added private core `CommandValidationOutcome`, `CommandIntent`, and `GroupOrderIntent` so accepted commands produce an internal intent.
+- Implemented explicit validation for wrong target tick, unknown participant, unknown group, and group ownership.
+- Added behavioural tests for accepted `HoldPosition`, unknown participant, unknown group, foreign-group command, wrong tick, and rejected commands producing no intent.
+- Updated `docs/GLOSSARY.md`, `simulation/README.md`, and added ADR-0006 for command sequence and target tick semantics.
+- Reviewed the next three pending steps and found no required scope or naming updates.
+- Ran `docker compose -f docker-compose.yml run --rm rust sh scripts/check.sh` successfully.
 
 ---
 

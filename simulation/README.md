@@ -55,6 +55,19 @@ The script runs:
 
 The match roster is explicit. `teams`, `participants`, and `groups` may be empty, but they are not inferred from missing fields.
 
+## Command Contract
+
+`sim-protocol` defines the first public command envelope with:
+
+- `CommandSequence`;
+- `TargetTick`;
+- `ParticipantId`;
+- `CommandPayload`.
+
+The first real command payload is `IssueGroupOrder` targeting a `GroupId` with the `HoldPosition` group order.
+
+`sim-core` validates command envelopes against the current authoritative tick and match roster. Accepted commands produce internal intents. Rejected commands produce structured public `CommandResult` values and no intent. Command validation does not mutate authoritative state in this stage.
+
 ## State Hash and Trace
 
 `sim-core` calculates authoritative state hashes with BLAKE3-256, as recorded in `docs/decisions/ADR-0001-BLAKE3-STATE-HASH.md`.

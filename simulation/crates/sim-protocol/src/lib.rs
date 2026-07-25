@@ -66,6 +66,32 @@ impl RunTicks {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct CommandSequence(u64);
+
+impl CommandSequence {
+    pub const fn new(value: u64) -> Self {
+        Self(value)
+    }
+
+    pub const fn value(self) -> u64 {
+        self.0
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct TargetTick(u64);
+
+impl TargetTick {
+    pub const fn new(value: u64) -> Self {
+        Self(value)
+    }
+
+    pub const fn value(self) -> u64 {
+        self.0
+    }
+}
+
 macro_rules! identifier_type {
     ($name:ident, $kind:expr) => {
         #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -312,6 +338,131 @@ fn validate_match_roster(
     }
 
     Ok(())
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GroupOrder {
+    HoldPosition,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IssueGroupOrder {
+    group_id: GroupId,
+    order: GroupOrder,
+}
+
+impl IssueGroupOrder {
+    pub fn new(group_id: GroupId, order: GroupOrder) -> Self {
+        Self { group_id, order }
+    }
+
+    pub fn group_id(&self) -> &GroupId {
+        &self.group_id
+    }
+
+    pub const fn order(&self) -> GroupOrder {
+        self.order
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CommandPayload {
+    IssueGroupOrder(IssueGroupOrder),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommandEnvelope {
+    sequence: CommandSequence,
+    target_tick: TargetTick,
+    participant_id: ParticipantId,
+    payload: CommandPayload,
+}
+
+impl CommandEnvelope {
+    pub fn new(
+        sequence: CommandSequence,
+        target_tick: TargetTick,
+        participant_id: ParticipantId,
+        payload: CommandPayload,
+    ) -> Self {
+        Self {
+            sequence,
+            target_tick,
+            participant_id,
+            payload,
+        }
+    }
+
+    pub const fn sequence(&self) -> CommandSequence {
+        self.sequence
+    }
+
+    pub const fn target_tick(&self) -> TargetTick {
+        self.target_tick
+    }
+
+    pub fn participant_id(&self) -> &ParticipantId {
+        &self.participant_id
+    }
+
+    pub const fn payload(&self) -> &CommandPayload {
+        &self.payload
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CommandRejectionReason {
+    WrongTargetTick,
+    UnknownParticipant,
+    UnknownGroup,
+    GroupNotControlledByParticipant,
+    DuplicateCommandSequence,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CommandResultStatus {
+    Accepted,
+    Rejected { reason: CommandRejectionReason },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommandResult {
+    sequence: CommandSequence,
+    target_tick: TargetTick,
+    participant_id: ParticipantId,
+    status: CommandResultStatus,
+}
+
+impl CommandResult {
+    pub fn new(
+        sequence: CommandSequence,
+        target_tick: TargetTick,
+        participant_id: ParticipantId,
+        status: CommandResultStatus,
+    ) -> Self {
+        Self {
+            sequence,
+            target_tick,
+            participant_id,
+            status,
+        }
+    }
+
+    pub const fn sequence(&self) -> CommandSequence {
+        self.sequence
+    }
+
+    pub const fn target_tick(&self) -> TargetTick {
+        self.target_tick
+    }
+
+    pub fn participant_id(&self) -> &ParticipantId {
+        &self.participant_id
+    }
+
+    pub const fn status(&self) -> CommandResultStatus {
+        self.status
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

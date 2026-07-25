@@ -22,10 +22,38 @@ A command-producing actor inside a specific match. A participant has a stable `P
 
 The public command target controlled by one participant. A group has a stable `GroupId`, references its controlling participant, and contains zero or more stable robot identifiers.
 
+## Group Order
+
+An order assigned to a group through a validated command. The first supported group order is `HoldPosition`. In the current stage this is a domain order only; it does not execute physical movement, formation, collision, or combat behaviour.
+
 ## Robot Identifier
 
 A stable `RobotId` that identifies a robot in the match roster. This stage does not define robot configuration, body, locomotion, modules, sockets, weapons, statistics, position, damage, or destruction.
 
+## Command
+
+An external request submitted to the simulation. A command is carried by a command envelope and is validated by the authoritative core before it can produce an internal intent.
+
+## Command Envelope
+
+The deterministic wrapper around a command payload. The current command envelope contains a `CommandSequence`, `TargetTick`, `ParticipantId`, and real command payload.
+
+## Command Result
+
+A public output describing whether one submitted command was accepted or rejected. A command result includes enough information to correlate it with the submitted command and uses structured rejection reasons.
+
+## Intent
+
+An internal validated instruction produced by command processing. Intents belong to `sim-core`; external adapters do not submit them directly.
+
+## Event
+
+An authoritative fact that occurred in the game world. Events are public gameplay outputs and are not diagnostic trace records.
+
 ## State Hash
 
 A deterministic BLAKE3-256 hash calculated from canonical authoritative state. Trace records, JSON formatting, filesystem paths, collection iteration order, memory addresses, and wall-clock data are excluded.
+
+## Trace
+
+Diagnostic information explaining how the simulation executed. Trace records are optional diagnostics and do not affect authoritative state, events, command results, or state hashes.
