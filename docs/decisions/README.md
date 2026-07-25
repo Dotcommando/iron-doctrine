@@ -12,6 +12,7 @@ An ADR records an important architectural or technical decision together with it
 - [ADR-0004: Docker Rust Development Environment](ADR-0004-DOCKER-RUST-DEVELOPMENT-ENVIRONMENT.md)
 - [ADR-0005: Canonical Roster State Hash](ADR-0005-CANONICAL-ROSTER-STATE-HASH.md)
 - [ADR-0006: Command Sequence and Target Tick](ADR-0006-COMMAND-SEQUENCE-AND-TARGET-TICK.md)
+- [ADR-0007: Active Group Order State](ADR-0007-ACTIVE-GROUP-ORDER-STATE.md)
 
 ## When to Create an ADR
 

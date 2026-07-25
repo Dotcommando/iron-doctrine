@@ -917,7 +917,7 @@ Do not test JSON formatting details when whole-contract protocol tests already p
 
 ## Step 3 — Deterministic Command Execution and Authoritative Event
 
-**Status:** Pending
+**Status:** Done
 
 ### Goal
 
@@ -980,6 +980,21 @@ Add a focused test for multiple accepted commands targeting the same group if th
 - Trace does not affect authoritative outputs.
 - All added tests failed before implementation and now pass.
 - The full Rust quality gate passes.
+
+### Done
+
+- Added `execute_tick_with_commands` and `execute_tick_with_commands_and_trace` while preserving empty `execute_tick` support.
+- Normalized command sets into deterministic sequence order independent of input collection order.
+- Rejected every command with a duplicate `CommandSequence` using `DuplicateCommandSequence`.
+- Applied accepted group-order intents in normalized order and stored persistent active group orders.
+- Added public `GameplayEvent::GroupOrderAssigned` with zero-based `EventOrdinal`.
+- Extended `TickResult` with command results and gameplay events.
+- Extended structured trace with command selection, normalization, validation, intent production, intent application, and event finalization records.
+- Extended the canonical state hash with active group orders.
+- Updated `simulation/README.md`, ADR-0005, ADR-0006, and added ADR-0007 for active group order state.
+- Added and verified behavioural tests for active order assignment, gameplay event emission, rejected-command non-mutation, sequence ordering, reordered command determinism, duplicate sequence rejection, and trace invariance.
+- Reviewed the next three pending steps and found no required scope or naming updates.
+- Ran `docker compose -f docker-compose.yml run --rm rust sh scripts/check.sh` successfully.
 
 ---
 

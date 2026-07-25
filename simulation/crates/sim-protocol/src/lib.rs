@@ -465,6 +465,71 @@ impl CommandResult {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct EventOrdinal(u32);
+
+impl EventOrdinal {
+    pub const fn new(value: u32) -> Self {
+        Self(value)
+    }
+
+    pub const fn value(self) -> u32 {
+        self.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GroupOrderAssignedEvent {
+    tick: u64,
+    ordinal: EventOrdinal,
+    group_id: GroupId,
+    participant_id: ParticipantId,
+    order: GroupOrder,
+}
+
+impl GroupOrderAssignedEvent {
+    pub fn new(
+        tick: u64,
+        ordinal: EventOrdinal,
+        group_id: GroupId,
+        participant_id: ParticipantId,
+        order: GroupOrder,
+    ) -> Self {
+        Self {
+            tick,
+            ordinal,
+            group_id,
+            participant_id,
+            order,
+        }
+    }
+
+    pub const fn tick(&self) -> u64 {
+        self.tick
+    }
+
+    pub const fn ordinal(&self) -> EventOrdinal {
+        self.ordinal
+    }
+
+    pub fn group_id(&self) -> &GroupId {
+        &self.group_id
+    }
+
+    pub fn participant_id(&self) -> &ParticipantId {
+        &self.participant_id
+    }
+
+    pub const fn order(&self) -> GroupOrder {
+        self.order
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GameplayEvent {
+    GroupOrderAssigned(GroupOrderAssignedEvent),
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HeadlessScenario {
     schema_version: SchemaVersion,

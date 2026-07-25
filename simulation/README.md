@@ -66,7 +66,9 @@ The match roster is explicit. `teams`, `participants`, and `groups` may be empty
 
 The first real command payload is `IssueGroupOrder` targeting a `GroupId` with the `HoldPosition` group order.
 
-`sim-core` validates command envelopes against the current authoritative tick and match roster. Accepted commands produce internal intents. Rejected commands produce structured public `CommandResult` values and no intent. Command validation does not mutate authoritative state in this stage.
+`sim-core` validates command envelopes against the current authoritative tick and match roster. Accepted commands produce internal intents. Rejected commands produce structured public `CommandResult` values and no intent.
+
+During tick execution, command sets are normalized into deterministic sequence order. Duplicate command sequences are rejected deterministically. Accepted `HoldPosition` commands assign the group's active group order, produce public `CommandResult` values, and emit `GroupOrderAssigned` gameplay events with zero-based ordinals inside the tick.
 
 ## State Hash and Trace
 
@@ -81,7 +83,8 @@ The first canonical state hash includes:
 - current authoritative tick;
 - team identifiers in canonical order;
 - participant identifiers and team membership in canonical order;
-- group identifiers, controlling participants, and robot identifiers in canonical order.
+- group identifiers, controlling participants, and robot identifiers in canonical order;
+- active group orders in canonical order.
 
 Execution trace records are structured diagnostics. They are not gameplay events and do not affect authoritative state hashes.
 

@@ -237,6 +237,12 @@ fn trace_output_records(trace: &ExecutionTrace) -> Vec<TraceRecordOutput> {
 fn trace_kind_name(kind: sim_core::TraceRecordKind) -> &'static str {
     match kind {
         sim_core::TraceRecordKind::TickStarted => "TickStarted",
+        sim_core::TraceRecordKind::CommandsSelected => "CommandsSelected",
+        sim_core::TraceRecordKind::CommandsNormalized => "CommandsNormalized",
+        sim_core::TraceRecordKind::CommandValidationCompleted => "CommandValidationCompleted",
+        sim_core::TraceRecordKind::IntentProduced => "IntentProduced",
+        sim_core::TraceRecordKind::IntentApplied => "IntentApplied",
+        sim_core::TraceRecordKind::GameplayEventsFinalized => "GameplayEventsFinalized",
         sim_core::TraceRecordKind::TickTransitionCalculated => "TickTransitionCalculated",
         sim_core::TraceRecordKind::TickTransitionApplied => "TickTransitionApplied",
         sim_core::TraceRecordKind::StateHashCalculated => "StateHashCalculated",

@@ -1,8 +1,13 @@
 #![forbid(unsafe_code)]
 
+use std::collections::{BTreeMap, BTreeSet};
+
 pub use sim_protocol::{CommandRejectionReason, CommandResult, CommandResultStatus};
 
-use sim_protocol::{CommandEnvelope, CommandPayload, GroupId, GroupOrder, MatchConfig};
+use sim_protocol::{
+    CommandEnvelope, CommandPayload, CommandSequence, EventOrdinal, GameplayEvent, GroupId,
+    GroupOrder, GroupOrderAssignedEvent, MatchConfig, ParticipantId,
+};
 
 const AUTHORITATIVE_STATE_VERSION: u16 = 1;
 const STATE_HASH_ALGORITHM: &str = "BLAKE3-256";
@@ -15,24 +20,34 @@ pub enum TickExecutionError {
     TickLimitReached { current_tick: u64 },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TickResult {
     started_tick: u64,
     completed_tick: u64,
     state_hash: StateHash,
+    command_results: Vec<CommandResult>,
+    gameplay_events: Vec<GameplayEvent>,
 }
 
 impl TickResult {
-    pub const fn started_tick(self) -> u64 {
+    pub const fn started_tick(&self) -> u64 {
         self.started_tick
     }
 
-    pub const fn completed_tick(self) -> u64 {
+    pub const fn completed_tick(&self) -> u64 {
         self.completed_tick
     }
 
-    pub const fn state_hash(self) -> StateHash {
+    pub const fn state_hash(&self) -> StateHash {
         self.state_hash
+    }
+
+    pub fn command_results(&self) -> &[CommandResult] {
+        &self.command_results
+    }
+
+    pub fn gameplay_events(&self) -> &[GameplayEvent] {
+        &self.gameplay_events
     }
 }
 
@@ -52,6 +67,12 @@ impl StateHash {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TraceRecordKind {
     TickStarted,
+    CommandsSelected,
+    CommandsNormalized,
+    CommandValidationCompleted,
+    IntentProduced,
+    IntentApplied,
+    GameplayEventsFinalized,
     TickTransitionCalculated,
     TickTransitionApplied,
     StateHashCalculated,
@@ -122,21 +143,87 @@ impl MatchSimulation {
         self.state.hash()
     }
 
+    pub fn active_group_order(&self, group_id: &GroupId) -> Option<GroupOrder> {
+        self.state.active_group_orders.get(group_id).copied()
+    }
+
     pub fn validate_command(&self, command: &CommandEnvelope) -> CommandResult {
         self.validate_command_for_intent(command).result
     }
 
     pub fn execute_tick(&mut self) -> Result<TickResult, TickExecutionError> {
-        self.execute_tick_with_trace(None)
+        self.execute_tick_with_commands(&[])
     }
 
     pub fn execute_tick_with_trace(
         &mut self,
         trace: Option<&mut ExecutionTrace>,
     ) -> Result<TickResult, TickExecutionError> {
+        self.execute_tick_with_commands_and_trace(&[], trace)
+    }
+
+    pub fn execute_tick_with_commands(
+        &mut self,
+        commands: &[CommandEnvelope],
+    ) -> Result<TickResult, TickExecutionError> {
+        self.execute_tick_with_commands_and_trace(commands, None)
+    }
+
+    pub fn execute_tick_with_commands_and_trace(
+        &mut self,
+        commands: &[CommandEnvelope],
+        trace: Option<&mut ExecutionTrace>,
+    ) -> Result<TickResult, TickExecutionError> {
         let mut trace = trace;
         let started_tick = self.verify_next_tick_may_begin()?;
         record_trace(&mut trace, started_tick, TraceRecordKind::TickStarted);
+
+        let selected_commands = select_commands_for_tick(commands);
+        record_trace(&mut trace, started_tick, TraceRecordKind::CommandsSelected);
+
+        let normalized_commands = normalize_commands(selected_commands);
+        record_trace(
+            &mut trace,
+            started_tick,
+            TraceRecordKind::CommandsNormalized,
+        );
+
+        let duplicate_sequences = duplicate_sequences(&normalized_commands);
+        let mut command_results = Vec::with_capacity(normalized_commands.len());
+        let mut accepted_intents = Vec::new();
+
+        for command in normalized_commands {
+            let outcome = if duplicate_sequences.contains(&command.sequence()) {
+                self.reject_command(command, CommandRejectionReason::DuplicateCommandSequence)
+            } else {
+                self.validate_command_for_intent(command)
+            };
+            record_trace(
+                &mut trace,
+                started_tick,
+                TraceRecordKind::CommandValidationCompleted,
+            );
+
+            if let Some(intent) = outcome.intent {
+                record_trace(&mut trace, started_tick, TraceRecordKind::IntentProduced);
+                accepted_intents.push((command.participant_id().clone(), intent));
+            }
+
+            command_results.push(outcome.result);
+        }
+
+        let mut gameplay_events = Vec::with_capacity(accepted_intents.len());
+        for (participant_id, intent) in accepted_intents {
+            let event =
+                self.apply_intent(started_tick, participant_id, intent, gameplay_events.len());
+            record_trace(&mut trace, started_tick, TraceRecordKind::IntentApplied);
+            gameplay_events.push(event);
+        }
+        record_trace(
+            &mut trace,
+            started_tick,
+            TraceRecordKind::GameplayEventsFinalized,
+        );
 
         let completed_tick = calculate_next_tick(started_tick)?;
         record_trace(
@@ -164,6 +251,8 @@ impl MatchSimulation {
             started_tick: started_tick.value(),
             completed_tick: completed_tick.value(),
             state_hash,
+            command_results,
+            gameplay_events,
         })
     }
 
@@ -248,6 +337,30 @@ impl MatchSimulation {
             intent: None,
         }
     }
+
+    fn apply_intent(
+        &mut self,
+        tick: AuthoritativeTick,
+        participant_id: ParticipantId,
+        intent: CommandIntent,
+        event_index: usize,
+    ) -> GameplayEvent {
+        match intent {
+            CommandIntent::IssueGroupOrder(intent) => {
+                self.state
+                    .active_group_orders
+                    .insert(intent.group_id.clone(), intent.order);
+
+                GameplayEvent::GroupOrderAssigned(GroupOrderAssignedEvent::new(
+                    tick.value(),
+                    EventOrdinal::new(event_index as u32),
+                    intent.group_id,
+                    participant_id,
+                    intent.order,
+                ))
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -279,17 +392,83 @@ fn command_validation_result(
     )
 }
 
+fn select_commands_for_tick(commands: &[CommandEnvelope]) -> Vec<&CommandEnvelope> {
+    commands.iter().collect()
+}
+
+fn normalize_commands(mut commands: Vec<&CommandEnvelope>) -> Vec<&CommandEnvelope> {
+    commands.sort_by(canonical_command_order);
+    commands
+}
+
+fn canonical_command_order(
+    left: &&CommandEnvelope,
+    right: &&CommandEnvelope,
+) -> std::cmp::Ordering {
+    canonical_command_key(left).cmp(&canonical_command_key(right))
+}
+
+fn canonical_command_key(command: &CommandEnvelope) -> CommandSortKey {
+    let (payload_kind, group_id, order) = match command.payload() {
+        CommandPayload::IssueGroupOrder(payload) => (
+            0_u8,
+            payload.group_id().value().to_owned(),
+            group_order_sort_value(payload.order()),
+        ),
+    };
+
+    CommandSortKey {
+        sequence: command.sequence().value(),
+        target_tick: command.target_tick().value(),
+        participant_id: command.participant_id().value().to_owned(),
+        payload_kind,
+        group_id,
+        order,
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct CommandSortKey {
+    sequence: u64,
+    target_tick: u64,
+    participant_id: String,
+    payload_kind: u8,
+    group_id: String,
+    order: u8,
+}
+
+fn group_order_sort_value(order: GroupOrder) -> u8 {
+    match order {
+        GroupOrder::HoldPosition => 0,
+    }
+}
+
+fn duplicate_sequences(commands: &[&CommandEnvelope]) -> BTreeSet<CommandSequence> {
+    let mut seen = BTreeSet::new();
+    let mut duplicates = BTreeSet::new();
+
+    for command in commands {
+        if !seen.insert(command.sequence()) {
+            duplicates.insert(command.sequence());
+        }
+    }
+
+    duplicates
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct AuthoritativeState {
     config: MatchConfig,
     current_tick: AuthoritativeTick,
+    active_group_orders: BTreeMap<GroupId, GroupOrder>,
 }
 
 impl AuthoritativeState {
-    const fn new(config: MatchConfig) -> Self {
+    fn new(config: MatchConfig) -> Self {
         Self {
             config,
             current_tick: AuthoritativeTick::ZERO,
+            active_group_orders: BTreeMap::new(),
         }
     }
 
@@ -301,6 +480,7 @@ impl AuthoritativeState {
         canonical.extend_from_slice(&self.config.seed().to_le_bytes());
         canonical.extend_from_slice(&self.current_tick.value().to_le_bytes());
         push_roster(&mut canonical, &self.config);
+        push_active_group_orders(&mut canonical, &self.active_group_orders);
 
         StateHash(*blake3::hash(&canonical).as_bytes())
     }
@@ -335,6 +515,17 @@ fn push_roster(canonical: &mut Vec<u8>, config: &MatchConfig) {
         for robot_id in robot_ids {
             push_string(canonical, robot_id.value());
         }
+    }
+}
+
+fn push_active_group_orders(
+    canonical: &mut Vec<u8>,
+    active_group_orders: &BTreeMap<GroupId, GroupOrder>,
+) {
+    push_len(canonical, active_group_orders.len());
+    for (group_id, order) in active_group_orders {
+        push_string(canonical, group_id.value());
+        canonical.push(group_order_sort_value(*order));
     }
 }
 
@@ -385,9 +576,9 @@ fn record_trace(
 mod tests {
     use super::*;
     use sim_protocol::{
-        CommandEnvelope, CommandPayload, CommandSequence, GroupConfig, GroupId, GroupOrder,
-        IssueGroupOrder, MatchConfig, MatchId, ParticipantConfig, ParticipantId, RobotId, Seed,
-        TargetTick, TeamConfig, TeamId, TickRateHz,
+        CommandEnvelope, CommandPayload, CommandSequence, GameplayEvent, GroupConfig, GroupId,
+        GroupOrder, IssueGroupOrder, MatchConfig, MatchId, ParticipantConfig, ParticipantId,
+        RobotId, Seed, TargetTick, TeamConfig, TeamId, TickRateHz,
     };
 
     fn id_match(value: &str) -> MatchId {
@@ -495,6 +686,22 @@ mod tests {
                 GroupOrder::HoldPosition,
             )),
         )
+    }
+
+    fn command_sequences(results: &[CommandResult]) -> Vec<u64> {
+        results
+            .iter()
+            .map(|result| result.sequence().value())
+            .collect()
+    }
+
+    fn group_order_event_groups(events: &[GameplayEvent]) -> Vec<&str> {
+        events
+            .iter()
+            .map(|event| match event {
+                GameplayEvent::GroupOrderAssigned(event) => event.group_id().value(),
+            })
+            .collect()
     }
 
     #[test]
@@ -623,6 +830,240 @@ mod tests {
             }
         );
         assert_eq!(validation.intent, None);
+    }
+
+    #[test]
+    fn accepted_hold_position_becomes_the_groups_active_order() {
+        let mut simulation = MatchSimulation::new(populated_match_config())
+            .expect("validated roster should create a simulation");
+        let command = group_order_command(
+            1,
+            0,
+            id_participant("participant-blue-1"),
+            id_group("group-blue-alpha"),
+        );
+
+        let result = simulation
+            .execute_tick_with_commands(&[command])
+            .expect("command tick should complete");
+
+        assert_eq!(
+            result.command_results()[0].status(),
+            CommandResultStatus::Accepted
+        );
+        assert_eq!(
+            simulation.active_group_order(&id_group("group-blue-alpha")),
+            Some(GroupOrder::HoldPosition)
+        );
+    }
+
+    #[test]
+    fn accepted_command_produces_one_authoritative_group_order_event() {
+        let mut simulation = MatchSimulation::new(populated_match_config())
+            .expect("validated roster should create a simulation");
+        let command = group_order_command(
+            1,
+            0,
+            id_participant("participant-blue-1"),
+            id_group("group-blue-alpha"),
+        );
+
+        let result = simulation
+            .execute_tick_with_commands(&[command])
+            .expect("command tick should complete");
+
+        assert_eq!(result.gameplay_events().len(), 1);
+        assert_eq!(
+            result.gameplay_events()[0],
+            GameplayEvent::GroupOrderAssigned(sim_protocol::GroupOrderAssignedEvent::new(
+                0,
+                sim_protocol::EventOrdinal::new(0),
+                id_group("group-blue-alpha"),
+                id_participant("participant-blue-1"),
+                GroupOrder::HoldPosition,
+            ))
+        );
+    }
+
+    #[test]
+    fn rejected_command_does_not_change_group_state_or_produce_event() {
+        let mut simulation = MatchSimulation::new(populated_match_config())
+            .expect("validated roster should create a simulation");
+        let command = group_order_command(
+            1,
+            0,
+            id_participant("participant-blue-1"),
+            id_group("group-red-alpha"),
+        );
+
+        let result = simulation
+            .execute_tick_with_commands(&[command])
+            .expect("command tick should complete");
+
+        assert_eq!(
+            result.command_results()[0].status(),
+            CommandResultStatus::Rejected {
+                reason: CommandRejectionReason::GroupNotControlledByParticipant,
+            }
+        );
+        assert_eq!(
+            simulation.active_group_order(&id_group("group-red-alpha")),
+            None
+        );
+        assert!(result.gameplay_events().is_empty());
+    }
+
+    #[test]
+    fn commands_are_processed_in_sequence_order_not_input_order() {
+        let mut simulation = MatchSimulation::new(populated_match_config())
+            .expect("validated roster should create a simulation");
+        let later = group_order_command(
+            2,
+            0,
+            id_participant("participant-red-1"),
+            id_group("group-red-alpha"),
+        );
+        let earlier = group_order_command(
+            1,
+            0,
+            id_participant("participant-blue-1"),
+            id_group("group-blue-alpha"),
+        );
+
+        let result = simulation
+            .execute_tick_with_commands(&[later, earlier])
+            .expect("command tick should complete");
+
+        assert_eq!(command_sequences(result.command_results()), vec![1, 2]);
+        assert_eq!(
+            group_order_event_groups(result.gameplay_events()),
+            vec!["group-blue-alpha", "group-red-alpha"]
+        );
+    }
+
+    #[test]
+    fn equivalent_command_sets_in_different_input_order_produce_identical_outputs_and_hashes() {
+        let first_commands = vec![
+            group_order_command(
+                2,
+                0,
+                id_participant("participant-red-1"),
+                id_group("group-red-alpha"),
+            ),
+            group_order_command(
+                1,
+                0,
+                id_participant("participant-blue-1"),
+                id_group("group-blue-alpha"),
+            ),
+        ];
+        let second_commands = vec![first_commands[1].clone(), first_commands[0].clone()];
+        let mut first = MatchSimulation::new(populated_match_config())
+            .expect("validated roster should create a simulation");
+        let mut second = MatchSimulation::new(populated_match_config())
+            .expect("validated roster should create a simulation");
+
+        let first_result = first
+            .execute_tick_with_commands(&first_commands)
+            .expect("first command tick should complete");
+        let second_result = second
+            .execute_tick_with_commands(&second_commands)
+            .expect("second command tick should complete");
+
+        assert_eq!(
+            first_result.command_results(),
+            second_result.command_results()
+        );
+        assert_eq!(
+            first_result.gameplay_events(),
+            second_result.gameplay_events()
+        );
+        assert_eq!(first_result.state_hash(), second_result.state_hash());
+        assert_eq!(first.state_hash(), second.state_hash());
+    }
+
+    #[test]
+    fn duplicate_command_sequences_are_rejected_deterministically() {
+        let duplicate_blue = group_order_command(
+            1,
+            0,
+            id_participant("participant-blue-1"),
+            id_group("group-blue-alpha"),
+        );
+        let duplicate_red = group_order_command(
+            1,
+            0,
+            id_participant("participant-red-1"),
+            id_group("group-red-alpha"),
+        );
+        let mut first = MatchSimulation::new(populated_match_config())
+            .expect("validated roster should create a simulation");
+        let mut second = MatchSimulation::new(populated_match_config())
+            .expect("validated roster should create a simulation");
+
+        let first_result = first
+            .execute_tick_with_commands(&[duplicate_blue.clone(), duplicate_red.clone()])
+            .expect("first duplicate command tick should complete");
+        let second_result = second
+            .execute_tick_with_commands(&[duplicate_red, duplicate_blue])
+            .expect("second duplicate command tick should complete");
+
+        assert_eq!(
+            first_result.command_results(),
+            second_result.command_results()
+        );
+        assert!(first_result.command_results().iter().all(|result| {
+            result.status()
+                == CommandResultStatus::Rejected {
+                    reason: CommandRejectionReason::DuplicateCommandSequence,
+                }
+        }));
+        assert!(first_result.gameplay_events().is_empty());
+        assert_eq!(
+            first.active_group_order(&id_group("group-blue-alpha")),
+            None
+        );
+        assert_eq!(first.active_group_order(&id_group("group-red-alpha")), None);
+    }
+
+    #[test]
+    fn enabling_trace_does_not_change_command_outputs_events_state_or_hash() {
+        let command = group_order_command(
+            1,
+            0,
+            id_participant("participant-blue-1"),
+            id_group("group-blue-alpha"),
+        );
+        let mut without_trace = MatchSimulation::new(populated_match_config())
+            .expect("validated roster should create a simulation");
+        let mut with_trace = MatchSimulation::new(populated_match_config())
+            .expect("validated roster should create a simulation");
+        let mut trace = ExecutionTrace::new();
+
+        let without_trace_result = without_trace
+            .execute_tick_with_commands(std::slice::from_ref(&command))
+            .expect("tick without trace should complete");
+        let with_trace_result = with_trace
+            .execute_tick_with_commands_and_trace(&[command], Some(&mut trace))
+            .expect("tick with trace should complete");
+
+        assert_eq!(
+            without_trace_result.command_results(),
+            with_trace_result.command_results()
+        );
+        assert_eq!(
+            without_trace_result.gameplay_events(),
+            with_trace_result.gameplay_events()
+        );
+        assert_eq!(
+            without_trace.active_group_order(&id_group("group-blue-alpha")),
+            with_trace.active_group_order(&id_group("group-blue-alpha"))
+        );
+        assert_eq!(
+            without_trace_result.state_hash(),
+            with_trace_result.state_hash()
+        );
+        assert_eq!(without_trace.state_hash(), with_trace.state_hash());
     }
 
     #[test]
@@ -807,12 +1248,15 @@ mod tests {
             trace_kinds,
             vec![
                 TraceRecordKind::TickStarted,
+                TraceRecordKind::CommandsSelected,
+                TraceRecordKind::CommandsNormalized,
+                TraceRecordKind::GameplayEventsFinalized,
                 TraceRecordKind::TickTransitionCalculated,
                 TraceRecordKind::TickTransitionApplied,
                 TraceRecordKind::StateHashCalculated,
                 TraceRecordKind::TickCompleted,
             ]
         );
-        assert_eq!(trace_ticks, vec![0, 0, 1, 1, 1]);
+        assert_eq!(trace_ticks, vec![0, 0, 0, 0, 0, 1, 1, 1]);
     }
 }

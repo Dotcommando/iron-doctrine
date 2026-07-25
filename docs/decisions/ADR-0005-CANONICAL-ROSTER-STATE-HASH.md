@@ -38,7 +38,7 @@ Counts and string lengths are encoded explicitly before variable-length collecti
 
 - Reordering teams, participants, groups, or robot identifiers without changing their meaning does not change the authoritative state hash.
 - Changing match identity, team membership, group control, or robot membership changes the authoritative state hash.
-- Future persistent authoritative fields must be added to the canonical state bytes and covered by tests.
+- Future persistent authoritative fields must be added to the canonical state bytes and covered by tests. ADR-0007 applies this rule to active group orders.
 
 ## Verification
 

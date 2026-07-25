@@ -37,12 +37,13 @@ The authoritative adapter that submits commands to `sim-core` is responsible for
 
 - Command results can be correlated with submitted commands without relying on array position.
 - Wrong-tick commands are rejected explicitly rather than moved.
-- Duplicate-sequence handling is part of deterministic command execution and is implemented when command sets are processed.
-- The current validation-only step can reject wrong-tick, unknown participant, unknown group, and ownership violations without mutating state.
+- Duplicate-sequence handling is part of deterministic command execution. All commands sharing a duplicate sequence are rejected with `DuplicateCommandSequence`.
+- Command validation rejects wrong-tick, unknown participant, unknown group, and ownership violations before any state mutation.
 
 ## Verification
 
 - `sim-core` tests prove a `HoldPosition` command from the controlling participant is accepted and produces an internal intent.
 - `sim-core` tests prove wrong-tick, unknown participant, unknown group, and foreign-group commands are rejected with structured reasons.
 - `sim-core` tests prove rejected commands produce no internal intent.
+- `sim-core` tests prove duplicate sequences are rejected deterministically independent of input order.
 - The Rust quality gate runs formatting, clippy with warnings denied, and all workspace tests inside Docker.
