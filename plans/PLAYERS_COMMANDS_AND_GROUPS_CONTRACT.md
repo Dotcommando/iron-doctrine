@@ -1104,7 +1104,7 @@ Tests must verify meaningful fields, not whitespace or formatting.
 
 ## Step 5 — Contract Documentation and Recorded Decisions
 
-**Status:** Pending
+**Status:** Done
 
 ### Goal
 
@@ -1161,6 +1161,16 @@ If documentation review exposes a behavioural inconsistency, add a reproducing t
 - Existing ADRs are updated or superseded according to repository rules.
 - No stale schema version, scenario, or CLI examples remain.
 - The full Rust quality gate passes after documentation changes.
+
+### Done
+
+- Updated the root `README.md` current status to reference `PLAYERS_COMMANDS_AND_GROUPS_CONTRACT.md` and the implemented Stage 2 gameplay contract.
+- Expanded `docs/GLOSSARY.md` with active group order, command sequence, target tick, command rejection reason, event ordinal, and headless scenario terminology.
+- Added ADR-0008 for the versioned headless scenario schema `2` and successful CLI result contract.
+- Updated `docs/decisions/README.md` with ADR-0008.
+- Clarified `simulation/README.md` with schema version support, target tick semantics, deterministic command sequence ordering, rejection reasons, `GroupOrderAssigned` event meaning, and zero-based event ordinals.
+- Reviewed the remaining pending Step 6 and found no required scope, naming, path, or scenario updates.
+- Ran `docker compose -f docker-compose.yml run --rm rust sh scripts/check.sh` successfully.
 
 ---
 

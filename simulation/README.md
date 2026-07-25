@@ -87,6 +87,8 @@ The script runs:
 The match roster is explicit. `teams`, `participants`, and `groups` may be empty, but they are not inferred from missing fields.
 `commands` is explicit and may be empty.
 
+The accepted schema version is `2`. Unsupported schema versions are rejected before simulation execution.
+
 ## Command Contract
 
 `sim-protocol` defines the first public command envelope with:
@@ -100,7 +102,21 @@ The first real command payload is `IssueGroupOrder` targeting a `GroupId` with t
 
 `sim-core` validates command envelopes against the current authoritative tick and match roster. Accepted commands produce internal intents. Rejected commands produce structured public `CommandResult` values and no intent.
 
-During tick execution, command sets are normalized into deterministic sequence order. Duplicate command sequences are rejected deterministically. Accepted `HoldPosition` commands assign the group's active group order, produce public `CommandResult` values, and emit `GroupOrderAssigned` gameplay events with zero-based ordinals inside the tick.
+`targetTick` must equal the simulation `currentTick` before the tick transition is executed. Commands for another tick are rejected with `WrongTargetTick`; they are not moved to the current tick.
+
+During tick execution, command sets are normalized into deterministic sequence order. Lower `CommandSequence` values are processed first for commands targeting the same tick. Duplicate command sequences are rejected deterministically with `DuplicateCommandSequence`.
+
+The current command rejection reasons are:
+
+- `WrongTargetTick`;
+- `UnknownParticipant`;
+- `UnknownGroup`;
+- `GroupNotControlledByParticipant`;
+- `DuplicateCommandSequence`.
+
+Accepted `HoldPosition` commands assign the group's active group order, produce public `CommandResult` values, and emit `GroupOrderAssigned` gameplay events with zero-based ordinals inside the tick.
+
+`GroupOrderAssigned` means the order was assigned. It does not mean the group physically held a position; movement, formation, collision, and combat behaviour do not exist in this stage.
 
 ## State Hash and Trace
 
@@ -175,6 +191,8 @@ The first gameplay event shape is:
   }
 }
 ```
+
+Event `ordinal` is a deterministic zero-based position within the authoritative tick.
 
 Error diagnostics are written to stderr, and failures exit with a non-zero status.
 

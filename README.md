@@ -95,8 +95,8 @@ Documentation, plans, identifiers, comments, and commit messages are written in 
 
 ## Current Status
 
-The Rust simulation workspace is being implemented through `plans/SIMULATION_EXECUTION_KERNEL.md`.
+The Rust simulation workspace is being implemented through `plans/PLAYERS_COMMANDS_AND_GROUPS_CONTRACT.md`.
 
-The repository currently contains a Docker-based Rust workspace, versioned headless scenario input, a deterministic empty-match kernel, canonical state hashing, structured execution trace, and a headless CLI scenario runner.
+The repository currently contains a Docker-based Rust workspace, versioned headless scenario input, explicit match rosters, group-level command envelopes, deterministic command ordering, structured command results, authoritative group-order events, canonical state hashing, structured execution trace, and a headless CLI scenario runner.
 
 Further architecture, gameplay contracts, tools, and implementation structure will continue to be introduced incrementally through reviewed plans rather than created speculatively in advance.

@@ -26,6 +26,10 @@ The public command target controlled by one participant. A group has a stable `G
 
 An order assigned to a group through a validated command. The first supported group order is `HoldPosition`. In the current stage this is a domain order only; it does not execute physical movement, formation, collision, or combat behaviour.
 
+## Active Group Order
+
+The persistent authoritative group order currently assigned to a group. A group may have no active group order or one active group order. Accepted `HoldPosition` commands set this state; rejected commands do not change it.
+
 ## Robot Identifier
 
 A stable `RobotId` that identifies a robot in the match roster. This stage does not define robot configuration, body, locomotion, modules, sockets, weapons, statistics, position, damage, or destruction.
@@ -38,9 +42,21 @@ An external request submitted to the simulation. A command is carried by a comma
 
 The deterministic wrapper around a command payload. The current command envelope contains a `CommandSequence`, `TargetTick`, `ParticipantId`, and real command payload.
 
+## Command Sequence
+
+The deterministic ordering and correlation value in a command envelope. Lower `CommandSequence` values are processed first for commands targeting the same tick. Duplicate command sequences are rejected deterministically.
+
+## Target Tick
+
+The authoritative tick that receives a command. `TargetTick` must equal the simulation `currentTick` before that tick transition is executed; commands are not silently moved to another tick.
+
 ## Command Result
 
 A public output describing whether one submitted command was accepted or rejected. A command result includes enough information to correlate it with the submitted command and uses structured rejection reasons.
+
+## Command Rejection Reason
+
+A structured reason explaining why a command was rejected. The current reasons are `WrongTargetTick`, `UnknownParticipant`, `UnknownGroup`, `GroupNotControlledByParticipant`, and `DuplicateCommandSequence`.
 
 ## Intent
 
@@ -50,6 +66,10 @@ An internal validated instruction produced by command processing. Intents belong
 
 An authoritative fact that occurred in the game world. Events are public gameplay outputs and are not diagnostic trace records.
 
+## Event Ordinal
+
+A deterministic zero-based position for a gameplay event within one authoritative tick. Event ordinals are not wall-clock timestamps and are not random identifiers.
+
 ## State Hash
 
 A deterministic BLAKE3-256 hash calculated from canonical authoritative state. Trace records, JSON formatting, filesystem paths, collection iteration order, memory addresses, and wall-clock data are excluded.
@@ -57,3 +77,7 @@ A deterministic BLAKE3-256 hash calculated from canonical authoritative state. T
 ## Trace
 
 Diagnostic information explaining how the simulation executed. Trace records are optional diagnostics and do not affect authoritative state, events, command results, or state hashes.
+
+## Headless Scenario
+
+A versioned JSON input consumed by `sim-cli run`. The current accepted schema is `schemaVersion: 2`; unsupported schema versions are rejected before simulation execution.
