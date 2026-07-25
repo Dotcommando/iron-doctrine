@@ -15,7 +15,7 @@ The hash must be calculated from canonical authoritative state, not from debug o
 
 Use BLAKE3-256 as the state hash algorithm for the first authoritative simulation kernel.
 
-The canonical state bytes are assembled explicitly by `sim-core` in a fixed order from authoritative data only. At this stage that data is:
+The canonical state bytes are assembled explicitly by `sim-core` in a fixed order from authoritative data only. In the first execution kernel that data was:
 
 - authoritative state version;
 - tick rate;
@@ -23,6 +23,8 @@ The canonical state bytes are assembled explicitly by `sim-core` in a fixed orde
 - current authoritative tick.
 
 Trace records are diagnostic output and are excluded from the hash.
+
+ADR-0005 extends the canonical state bytes with match roster data while preserving the BLAKE3-256 algorithm selected here.
 
 ## Alternatives Considered
 

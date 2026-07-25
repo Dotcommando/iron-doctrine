@@ -41,13 +41,19 @@ The script runs:
 {
   "schemaVersion": 1,
   "match": {
+    "matchId": "match-empty-001",
     "tickRateHz": 20,
-    "seed": 123456
+    "seed": 123456,
+    "teams": [],
+    "participants": [],
+    "groups": []
   },
   "runTicks": 3,
   "trace": true
 }
 ```
+
+The match roster is explicit. `teams`, `participants`, and `groups` may be empty, but they are not inferred from missing fields.
 
 ## State Hash and Trace
 
@@ -56,9 +62,13 @@ The script runs:
 The first canonical state hash includes:
 
 - authoritative state version;
+- match identifier;
 - tick rate;
 - seed;
-- current authoritative tick.
+- current authoritative tick;
+- team identifiers in canonical order;
+- participant identifiers and team membership in canonical order;
+- group identifiers, controlling participants, and robot identifiers in canonical order.
 
 Execution trace records are structured diagnostics. They are not gameplay events and do not affect authoritative state hashes.
 

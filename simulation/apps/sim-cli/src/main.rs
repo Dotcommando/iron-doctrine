@@ -8,7 +8,8 @@ use std::process::ExitCode;
 use serde::Serialize;
 use sim_core::{ExecutionTrace, MatchCreationError, MatchSimulation, TickExecutionError};
 use sim_protocol::{
-    HeadlessScenario, ScenarioInputError, ScenarioValidationError, parse_headless_scenario_json,
+    HeadlessScenario, IdentifierKind, IdentifierValidationError, MatchConfigValidationError,
+    ScenarioInputError, ScenarioValidationError, parse_headless_scenario_json,
 };
 
 fn main() -> ExitCode {
@@ -45,7 +46,7 @@ fn run_scenario(path: &Path) -> Result<String, CliError> {
 
 fn execute_scenario(scenario: HeadlessScenario) -> Result<RunOutput, CliError> {
     let mut simulation =
-        MatchSimulation::new(scenario.match_config()).map_err(CliError::CreateMatch)?;
+        MatchSimulation::new(scenario.match_config().clone()).map_err(CliError::CreateMatch)?;
     let initial_tick = simulation.current_tick();
     let mut completed_ticks = 0;
     let mut trace = ExecutionTrace::new();
@@ -140,6 +141,65 @@ fn format_scenario_validation_error(error: &ScenarioValidationError) -> String {
         }
         ScenarioValidationError::InvalidRunTicks { found } => {
             format!("invalid run ticks {found}; expected a positive value")
+        }
+        ScenarioValidationError::InvalidIdentifier { error } => format_identifier_error(error),
+        ScenarioValidationError::InvalidMatchConfig { error } => format_match_config_error(error),
+    }
+}
+
+fn format_identifier_error(error: &IdentifierValidationError) -> String {
+    match error {
+        IdentifierValidationError::Empty { kind } => {
+            format!(
+                "invalid {} identifier; expected a non-empty value",
+                identifier_kind_name(*kind)
+            )
+        }
+    }
+}
+
+fn identifier_kind_name(kind: IdentifierKind) -> &'static str {
+    match kind {
+        IdentifierKind::Match => "match",
+        IdentifierKind::Team => "team",
+        IdentifierKind::Participant => "participant",
+        IdentifierKind::Group => "group",
+        IdentifierKind::Robot => "robot",
+    }
+}
+
+fn format_match_config_error(error: &MatchConfigValidationError) -> String {
+    match error {
+        MatchConfigValidationError::DuplicateTeamId { team_id } => {
+            format!("duplicate team identifier '{}'", team_id.value())
+        }
+        MatchConfigValidationError::DuplicateParticipantId { participant_id } => {
+            format!(
+                "duplicate participant identifier '{}'",
+                participant_id.value()
+            )
+        }
+        MatchConfigValidationError::UnknownParticipantTeam {
+            participant_id,
+            team_id,
+        } => format!(
+            "participant '{}' references unknown team '{}'",
+            participant_id.value(),
+            team_id.value()
+        ),
+        MatchConfigValidationError::DuplicateGroupId { group_id } => {
+            format!("duplicate group identifier '{}'", group_id.value())
+        }
+        MatchConfigValidationError::UnknownGroupController {
+            group_id,
+            controller_participant_id,
+        } => format!(
+            "group '{}' references unknown controlling participant '{}'",
+            group_id.value(),
+            controller_participant_id.value()
+        ),
+        MatchConfigValidationError::DuplicateRobotId { robot_id } => {
+            format!("duplicate robot identifier '{}'", robot_id.value())
         }
     }
 }

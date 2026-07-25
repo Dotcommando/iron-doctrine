@@ -73,8 +73,12 @@ fn invalid_scenario_fails() {
         r#"{
             "schemaVersion": 1,
             "match": {
+                "matchId": "match-invalid-001",
                 "tickRateHz": 0,
-                "seed": 123456
+                "seed": 123456,
+                "teams": [],
+                "participants": [],
+                "groups": []
             },
             "runTicks": 3,
             "trace": false

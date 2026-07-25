@@ -755,7 +755,7 @@ Every defect discovered during implementation must receive a reproducing test or
 
 ## Step 1 — Match Identity, Teams, Participants, and Groups
 
-**Status:** Pending
+**Status:** Done
 
 ### Goal
 
@@ -814,6 +814,18 @@ Add additional tests only when needed to distinguish materially different valida
 - Glossary terminology matches code and protocol names.
 - All added tests failed before implementation and now pass.
 - The full Rust quality gate passes.
+
+### Done
+
+- Added validated `MatchId`, `TeamId`, `ParticipantId`, `GroupId`, and `RobotId` protocol types.
+- Added `TeamConfig`, `ParticipantConfig`, `GroupConfig`, and validated `MatchConfig` roster construction.
+- Added structured roster validation errors for duplicate teams, participants, groups, and robots, unknown participant teams, and unknown group controllers.
+- Extended `MatchSimulation` and authoritative state hashing to preserve match identity and canonical roster data.
+- Updated the explicit empty-match scenario shape with `matchId`, `teams`, `participants`, and `groups`.
+- Updated `docs/GLOSSARY.md`, `simulation/README.md`, ADR-0001, and added ADR-0005 for canonical roster state hashing.
+- Added and verified behavioural tests for valid roster creation, invalid roster references, duplicate roster identifiers, duplicate robot membership, and roster-order-independent hashing.
+- Reviewed the next three pending steps and found no required scope or naming updates.
+- Ran `docker compose -f docker-compose.yml run --rm rust sh scripts/check.sh` successfully.
 
 ---
 

@@ -96,13 +96,13 @@ impl ExecutionTrace {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MatchSimulation {
     state: AuthoritativeState,
 }
 
 impl MatchSimulation {
-    pub const fn new(config: MatchConfig) -> Result<Self, MatchCreationError> {
+    pub fn new(config: MatchConfig) -> Result<Self, MatchCreationError> {
         Ok(Self {
             state: AuthoritativeState::new(config),
         })
@@ -112,8 +112,8 @@ impl MatchSimulation {
         self.state.current_tick.value()
     }
 
-    pub const fn match_config(&self) -> MatchConfig {
-        self.state.config
+    pub const fn match_config(&self) -> &MatchConfig {
+        &self.state.config
     }
 
     pub fn state_hash(&self) -> StateHash {
@@ -177,7 +177,7 @@ impl MatchSimulation {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct AuthoritativeState {
     config: MatchConfig,
     current_tick: AuthoritativeTick,
@@ -191,15 +191,59 @@ impl AuthoritativeState {
         }
     }
 
-    fn hash(self) -> StateHash {
-        let mut canonical = Vec::with_capacity(2 + 2 + 8 + 8);
+    fn hash(&self) -> StateHash {
+        let mut canonical = Vec::new();
         canonical.extend_from_slice(&AUTHORITATIVE_STATE_VERSION.to_le_bytes());
+        push_string(&mut canonical, self.config.match_id().value());
         canonical.extend_from_slice(&self.config.tick_rate_hz().to_le_bytes());
         canonical.extend_from_slice(&self.config.seed().to_le_bytes());
         canonical.extend_from_slice(&self.current_tick.value().to_le_bytes());
+        push_roster(&mut canonical, &self.config);
 
         StateHash(*blake3::hash(&canonical).as_bytes())
     }
+}
+
+fn push_roster(canonical: &mut Vec<u8>, config: &MatchConfig) {
+    let mut teams = config.teams().iter().collect::<Vec<_>>();
+    teams.sort_by_key(|team| team.team_id().value());
+    push_len(canonical, teams.len());
+    for team in teams {
+        push_string(canonical, team.team_id().value());
+    }
+
+    let mut participants = config.participants().iter().collect::<Vec<_>>();
+    participants.sort_by_key(|participant| participant.participant_id().value());
+    push_len(canonical, participants.len());
+    for participant in participants {
+        push_string(canonical, participant.participant_id().value());
+        push_string(canonical, participant.team_id().value());
+    }
+
+    let mut groups = config.groups().iter().collect::<Vec<_>>();
+    groups.sort_by_key(|group| group.group_id().value());
+    push_len(canonical, groups.len());
+    for group in groups {
+        push_string(canonical, group.group_id().value());
+        push_string(canonical, group.controller_participant_id().value());
+
+        let mut robot_ids = group.robot_ids().iter().collect::<Vec<_>>();
+        robot_ids.sort_by_key(|robot_id| robot_id.value());
+        push_len(canonical, robot_ids.len());
+        for robot_id in robot_ids {
+            push_string(canonical, robot_id.value());
+        }
+    }
+}
+
+fn push_len(canonical: &mut Vec<u8>, len: usize) {
+    canonical.extend_from_slice(&(len as u32).to_le_bytes());
+}
+
+fn push_string(canonical: &mut Vec<u8>, value: &str) {
+    let bytes = value.as_bytes();
+    push_len(canonical, bytes.len());
+    canonical.extend_from_slice(bytes);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -238,13 +282,99 @@ fn record_trace(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sim_protocol::{MatchConfig, Seed, TickRateHz};
+    use sim_protocol::{
+        GroupConfig, GroupId, MatchConfig, MatchId, ParticipantConfig, ParticipantId, RobotId,
+        Seed, TeamConfig, TeamId, TickRateHz,
+    };
+
+    fn id_match(value: &str) -> MatchId {
+        MatchId::new(value).expect("test match id is valid")
+    }
+
+    fn id_team(value: &str) -> TeamId {
+        TeamId::new(value).expect("test team id is valid")
+    }
+
+    fn id_participant(value: &str) -> ParticipantId {
+        ParticipantId::new(value).expect("test participant id is valid")
+    }
+
+    fn id_group(value: &str) -> GroupId {
+        GroupId::new(value).expect("test group id is valid")
+    }
+
+    fn id_robot(value: &str) -> RobotId {
+        RobotId::new(value).expect("test robot id is valid")
+    }
 
     fn match_config(seed: u64) -> MatchConfig {
         MatchConfig::new(
+            id_match("match-001"),
             TickRateHz::new(20).expect("test tick rate is valid"),
             Seed::new(seed),
+            vec![],
+            vec![],
+            vec![],
         )
+        .expect("empty roster is explicit and valid")
+    }
+
+    fn populated_match_config() -> MatchConfig {
+        MatchConfig::new(
+            id_match("match-001"),
+            TickRateHz::new(20).expect("test tick rate is valid"),
+            Seed::new(123456),
+            vec![
+                TeamConfig::new(id_team("team-blue")),
+                TeamConfig::new(id_team("team-red")),
+            ],
+            vec![
+                ParticipantConfig::new(id_participant("participant-blue-1"), id_team("team-blue")),
+                ParticipantConfig::new(id_participant("participant-red-1"), id_team("team-red")),
+            ],
+            vec![
+                GroupConfig::new(
+                    id_group("group-blue-alpha"),
+                    id_participant("participant-blue-1"),
+                    vec![id_robot("robot-blue-001"), id_robot("robot-blue-002")],
+                ),
+                GroupConfig::new(
+                    id_group("group-red-alpha"),
+                    id_participant("participant-red-1"),
+                    vec![id_robot("robot-red-001"), id_robot("robot-red-002")],
+                ),
+            ],
+        )
+        .expect("valid roster should pass validation")
+    }
+
+    fn reordered_populated_match_config() -> MatchConfig {
+        MatchConfig::new(
+            id_match("match-001"),
+            TickRateHz::new(20).expect("test tick rate is valid"),
+            Seed::new(123456),
+            vec![
+                TeamConfig::new(id_team("team-red")),
+                TeamConfig::new(id_team("team-blue")),
+            ],
+            vec![
+                ParticipantConfig::new(id_participant("participant-red-1"), id_team("team-red")),
+                ParticipantConfig::new(id_participant("participant-blue-1"), id_team("team-blue")),
+            ],
+            vec![
+                GroupConfig::new(
+                    id_group("group-red-alpha"),
+                    id_participant("participant-red-1"),
+                    vec![id_robot("robot-red-002"), id_robot("robot-red-001")],
+                ),
+                GroupConfig::new(
+                    id_group("group-blue-alpha"),
+                    id_participant("participant-blue-1"),
+                    vec![id_robot("robot-blue-002"), id_robot("robot-blue-001")],
+                ),
+            ],
+        )
+        .expect("valid reordered roster should pass validation")
     }
 
     #[test]
@@ -253,6 +383,15 @@ mod tests {
             .expect("validated configuration should create a simulation");
 
         assert_eq!(simulation.current_tick(), 0);
+    }
+
+    #[test]
+    fn valid_roster_with_teams_participants_and_groups_creates_a_simulation() {
+        let simulation = MatchSimulation::new(populated_match_config())
+            .expect("validated roster should create a simulation");
+
+        assert_eq!(simulation.current_tick(), 0);
+        assert_eq!(simulation.match_config().match_id().value(), "match-001");
     }
 
     #[test]
@@ -378,6 +517,16 @@ mod tests {
         two_ticks.execute_tick().expect("tick 2 should complete");
 
         assert_ne!(one_tick.state_hash(), two_ticks.state_hash());
+    }
+
+    #[test]
+    fn equivalent_rosters_in_different_input_order_produce_the_same_initial_hash() {
+        let first = MatchSimulation::new(populated_match_config())
+            .expect("validated roster should create a simulation");
+        let second = MatchSimulation::new(reordered_populated_match_config())
+            .expect("validated reordered roster should create a simulation");
+
+        assert_eq!(first.state_hash(), second.state_hash());
     }
 
     #[test]
