@@ -1,6 +1,6 @@
 # Iron Doctrine — Players, Commands, and Groups Contract
 
-- Plan status: Pending
+- Plan status: Complete
 - File: `plans/PLAYERS_COMMANDS_AND_GROUPS_CONTRACT.md`
 - Previous plan: `SIMULATION_EXECUTION_KERNEL.md`
 - Next plan: Stage 3 — Modular Robot Model
@@ -1176,7 +1176,7 @@ If documentation review exposes a behavioural inconsistency, add a reproducing t
 
 ## Step 6 — End-to-End Verification and Plan Completion
 
-**Status:** Pending
+**Status:** Done
 
 ### Goal
 
@@ -1250,6 +1250,20 @@ Do not add tests solely to increase test count.
 - The plan is marked `Complete`.
 - The completion report lists changed files, checks, assumptions, unresolved questions, and known risks.
 - The next plan does not invent the concrete robot model before purchased assets have been studied.
+
+### Done
+
+- Built the Docker development image with `docker compose -f docker-compose.yml build rust`.
+- Verified the pinned Docker Rust toolchain: `rustc 1.97.1 (8bab26f4f 2026-07-14)` and `cargo 1.97.1 (c980f4866 2026-06-30)`.
+- Ran the complete Docker Rust quality gate with `docker compose -f docker-compose.yml run --rm rust sh scripts/check.sh`.
+- Executed the valid `group-order.json` scenario twice and verified matching authoritative command results, gameplay events, and state hash.
+- Executed semantically equivalent ordered and reordered command scenarios and verified matching command results, gameplay events, and state hash.
+- Executed `foreign-group-order.json` and verified a structured `GroupNotControlledByParticipant` rejection without gameplay events or unauthorized state mutation.
+- Executed `invalid-roster.json` and verified a controlled non-zero CLI failure with a useful roster diagnostic.
+- Verified trace order and trace invariance through the existing unit and integration tests included in the full quality gate.
+- Captured `git status --short`; only this plan file changed during Step 6.
+- Reviewed the remaining pending steps and found none; marked the plan `Complete`.
+- Identified the next active plan subject as Stage 3 preparation for modular robot model constraints, with concrete robot model details deferred until purchased assets have been studied.
 
 ## Expected Stage Result
 
