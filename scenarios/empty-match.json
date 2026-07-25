@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "match": {
     "matchId": "match-empty-001",
     "tickRateHz": 20,
@@ -8,6 +8,7 @@
     "participants": [],
     "groups": []
   },
+  "commands": [],
   "runTicks": 3,
   "trace": true
 }

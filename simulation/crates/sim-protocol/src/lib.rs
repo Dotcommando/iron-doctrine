@@ -8,7 +8,7 @@ use serde::Deserialize;
 pub struct SchemaVersion(u16);
 
 impl SchemaVersion {
-    pub const SUPPORTED: Self = Self(1);
+    pub const SUPPORTED: Self = Self(2);
 
     pub const fn new(value: u16) -> Self {
         Self(value)
@@ -534,6 +534,7 @@ pub enum GameplayEvent {
 pub struct HeadlessScenario {
     schema_version: SchemaVersion,
     match_config: MatchConfig,
+    commands: Vec<CommandEnvelope>,
     run_ticks: RunTicks,
     trace: bool,
 }
@@ -545,6 +546,10 @@ impl HeadlessScenario {
 
     pub const fn match_config(&self) -> &MatchConfig {
         &self.match_config
+    }
+
+    pub fn commands(&self) -> &[CommandEnvelope] {
+        &self.commands
     }
 
     pub const fn run_ticks(&self) -> u32 {
@@ -588,6 +593,7 @@ struct RawHeadlessScenario {
     schema_version: u16,
     #[serde(rename = "match")]
     match_config: RawMatchConfig,
+    commands: Vec<RawCommandEnvelope>,
     run_ticks: u32,
     trace: bool,
 }
@@ -622,6 +628,31 @@ struct RawGroupConfig {
     group_id: String,
     controller_participant_id: String,
     robot_ids: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct RawCommandEnvelope {
+    sequence: u64,
+    target_tick: u64,
+    participant_id: String,
+    payload: RawCommandPayload,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "kind", rename_all = "PascalCase", deny_unknown_fields)]
+enum RawCommandPayload {
+    IssueGroupOrder {
+        #[serde(rename = "groupId")]
+        group_id: String,
+        order: RawGroupOrder,
+    },
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "kind", rename_all = "PascalCase", deny_unknown_fields)]
+enum RawGroupOrder {
+    HoldPosition,
 }
 
 pub fn parse_headless_scenario_json(source: &str) -> Result<HeadlessScenario, ScenarioInputError> {
@@ -702,10 +733,35 @@ fn validate_headless_scenario(
         groups,
     )
     .map_err(|error| ScenarioValidationError::InvalidMatchConfig { error })?;
+    let commands = raw
+        .commands
+        .into_iter()
+        .map(|command| {
+            Ok(CommandEnvelope::new(
+                CommandSequence::new(command.sequence),
+                TargetTick::new(command.target_tick),
+                ParticipantId::new(command.participant_id)
+                    .map_err(|error| ScenarioValidationError::InvalidIdentifier { error })?,
+                match command.payload {
+                    RawCommandPayload::IssueGroupOrder { group_id, order } => {
+                        CommandPayload::IssueGroupOrder(IssueGroupOrder::new(
+                            GroupId::new(group_id).map_err(|error| {
+                                ScenarioValidationError::InvalidIdentifier { error }
+                            })?,
+                            match order {
+                                RawGroupOrder::HoldPosition => GroupOrder::HoldPosition,
+                            },
+                        ))
+                    }
+                },
+            ))
+        })
+        .collect::<Result<Vec<_>, ScenarioValidationError>>()?;
 
     Ok(HeadlessScenario {
         schema_version,
         match_config,
+        commands,
         run_ticks,
         trace: raw.trace,
     })
@@ -767,7 +823,7 @@ mod tests {
     fn valid_scenario_json(seed: u64) -> String {
         format!(
             r#"{{
-                "schemaVersion": 1,
+                "schemaVersion": 2,
                 "match": {{
                     "matchId": "match-001",
                     "tickRateHz": 20,
@@ -776,6 +832,7 @@ mod tests {
                     "participants": [],
                     "groups": []
                 }},
+                "commands": [],
                 "runTicks": 3,
                 "trace": true
             }}"#
@@ -797,14 +854,14 @@ mod tests {
     #[test]
     fn unsupported_schema_version_is_rejected() {
         let json =
-            valid_scenario_json(123456).replace(r#""schemaVersion": 1"#, r#""schemaVersion": 2"#);
+            valid_scenario_json(123456).replace(r#""schemaVersion": 2"#, r#""schemaVersion": 1"#);
 
-        let error = parse_headless_scenario_json(&json).expect_err("version 2 is unsupported");
+        let error = parse_headless_scenario_json(&json).expect_err("version 1 is unsupported");
 
         assert_eq!(
             error,
             ScenarioInputError::Validation(ScenarioValidationError::UnsupportedSchemaVersion {
-                found: SchemaVersion::new(2),
+                found: SchemaVersion::new(1),
                 supported: SchemaVersion::SUPPORTED,
             })
         );

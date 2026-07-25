@@ -35,25 +35,57 @@ The script runs:
 
 ## Headless Scenario Input
 
-`sim-protocol` accepts the first versioned headless scenario shape:
+`sim-protocol` accepts the Stage 2 versioned headless scenario shape:
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "match": {
-    "matchId": "match-empty-001",
+    "matchId": "match-group-order-001",
     "tickRateHz": 20,
     "seed": 123456,
-    "teams": [],
-    "participants": [],
-    "groups": []
+    "teams": [
+      {
+        "teamId": "team-blue"
+      }
+    ],
+    "participants": [
+      {
+        "participantId": "participant-blue-1",
+        "teamId": "team-blue"
+      }
+    ],
+    "groups": [
+      {
+        "groupId": "group-blue-alpha",
+        "controllerParticipantId": "participant-blue-1",
+        "robotIds": [
+          "robot-blue-001"
+        ]
+      }
+    ]
   },
-  "runTicks": 3,
+  "commands": [
+    {
+      "sequence": 1,
+      "targetTick": 0,
+      "participantId": "participant-blue-1",
+      "payload": {
+        "kind": "IssueGroupOrder",
+        "groupId": "group-blue-alpha",
+        "order": {
+          "kind": "HoldPosition"
+        }
+      }
+    }
+  ],
+  "runTicks": 1,
   "trace": true
 }
 ```
 
 The match roster is explicit. `teams`, `participants`, and `groups` may be empty, but they are not inferred from missing fields.
+`commands` is explicit and may be empty.
 
 ## Command Contract
 
@@ -93,10 +125,68 @@ Execution trace records are structured diagnostics. They are not gameplay events
 `sim-cli run` writes successful results to stdout as JSON with:
 
 - `schemaVersion`;
+- `matchId`;
 - `initialTick`;
 - `completedTicks`;
 - `finalTick`;
 - `stateHash`;
+- `commandResults`;
+- `gameplayEvents`;
 - `trace` when requested by the scenario.
 
+Accepted commands are represented as:
+
+```json
+{
+  "sequence": 1,
+  "targetTick": 0,
+  "participantId": "participant-blue-1",
+  "status": {
+    "kind": "Accepted"
+  }
+}
+```
+
+Rejected commands are successful simulation output when the match itself remains valid:
+
+```json
+{
+  "sequence": 1,
+  "targetTick": 0,
+  "participantId": "participant-blue-1",
+  "status": {
+    "kind": "Rejected",
+    "reason": "GroupNotControlledByParticipant"
+  }
+}
+```
+
+The first gameplay event shape is:
+
+```json
+{
+  "kind": "GroupOrderAssigned",
+  "tick": 0,
+  "ordinal": 0,
+  "groupId": "group-blue-alpha",
+  "participantId": "participant-blue-1",
+  "order": {
+    "kind": "HoldPosition"
+  }
+}
+```
+
 Error diagnostics are written to stderr, and failures exit with a non-zero status.
+
+Verified scenario commands from this directory:
+
+```powershell
+cargo run -p sim-cli -- run ../scenarios/empty-match.json
+cargo run -p sim-cli -- run ../scenarios/group-order.json
+cargo run -p sim-cli -- run ../scenarios/foreign-group-order.json
+cargo run -p sim-cli -- run ../scenarios/two-group-orders-ordered.json
+cargo run -p sim-cli -- run ../scenarios/two-group-orders-reordered.json
+cargo run -p sim-cli -- run ../scenarios/unknown-participant-command.json
+```
+
+`../scenarios/invalid-roster.json` is expected to fail with a controlled non-zero CLI result.

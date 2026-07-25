@@ -8,8 +8,10 @@ use std::process::ExitCode;
 use serde::Serialize;
 use sim_core::{ExecutionTrace, MatchCreationError, MatchSimulation, TickExecutionError};
 use sim_protocol::{
-    HeadlessScenario, IdentifierKind, IdentifierValidationError, MatchConfigValidationError,
-    ScenarioInputError, ScenarioValidationError, parse_headless_scenario_json,
+    CommandEnvelope, CommandRejectionReason, CommandResult, CommandResultStatus, GameplayEvent,
+    GroupOrder, HeadlessScenario, IdentifierKind, IdentifierValidationError,
+    MatchConfigValidationError, ScenarioInputError, ScenarioValidationError,
+    parse_headless_scenario_json,
 };
 
 fn main() -> ExitCode {
@@ -50,15 +52,33 @@ fn execute_scenario(scenario: HeadlessScenario) -> Result<RunOutput, CliError> {
     let initial_tick = simulation.current_tick();
     let mut completed_ticks = 0;
     let mut trace = ExecutionTrace::new();
+    let mut command_results = Vec::new();
+    let mut gameplay_events = Vec::new();
 
     for _ in 0..scenario.run_ticks() {
-        if scenario.trace_enabled() {
+        let commands = commands_for_tick(scenario.commands(), simulation.current_tick());
+        let tick_result = if scenario.trace_enabled() {
             simulation
-                .execute_tick_with_trace(Some(&mut trace))
-                .map_err(CliError::ExecuteTick)?;
+                .execute_tick_with_commands_and_trace(&commands, Some(&mut trace))
+                .map_err(CliError::ExecuteTick)?
         } else {
-            simulation.execute_tick().map_err(CliError::ExecuteTick)?;
-        }
+            simulation
+                .execute_tick_with_commands(&commands)
+                .map_err(CliError::ExecuteTick)?
+        };
+
+        command_results.extend(
+            tick_result
+                .command_results()
+                .iter()
+                .map(command_result_output),
+        );
+        gameplay_events.extend(
+            tick_result
+                .gameplay_events()
+                .iter()
+                .map(gameplay_event_output),
+        );
         completed_ticks += 1;
     }
 
@@ -70,12 +90,23 @@ fn execute_scenario(scenario: HeadlessScenario) -> Result<RunOutput, CliError> {
 
     Ok(RunOutput {
         schema_version: scenario.schema_version().value(),
+        match_id: scenario.match_config().match_id().value().to_owned(),
         initial_tick,
         completed_ticks,
         final_tick: simulation.current_tick(),
         state_hash: state_hash_hex(simulation.state_hash().bytes()),
+        command_results,
+        gameplay_events,
         trace,
     })
+}
+
+fn commands_for_tick(commands: &[CommandEnvelope], tick: u64) -> Vec<CommandEnvelope> {
+    commands
+        .iter()
+        .filter(|command| command.target_tick().value() == tick)
+        .cloned()
+        .collect()
 }
 
 #[derive(Debug)]
@@ -208,12 +239,49 @@ fn format_match_config_error(error: &MatchConfigValidationError) -> String {
 #[serde(rename_all = "camelCase")]
 struct RunOutput {
     schema_version: u16,
+    match_id: String,
     initial_tick: u64,
     completed_ticks: u32,
     final_tick: u64,
     state_hash: String,
+    command_results: Vec<CommandResultOutput>,
+    gameplay_events: Vec<GameplayEventOutput>,
     #[serde(skip_serializing_if = "Option::is_none")]
     trace: Option<Vec<TraceRecordOutput>>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CommandResultOutput {
+    sequence: u64,
+    target_tick: u64,
+    participant_id: String,
+    status: CommandResultStatusOutput,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CommandResultStatusOutput {
+    kind: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reason: Option<&'static str>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct GameplayEventOutput {
+    kind: &'static str,
+    tick: u64,
+    ordinal: u32,
+    group_id: String,
+    participant_id: String,
+    order: GroupOrderOutput,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct GroupOrderOutput {
+    kind: &'static str,
 }
 
 #[derive(Debug, Serialize)]
@@ -221,6 +289,61 @@ struct RunOutput {
 struct TraceRecordOutput {
     tick: u64,
     kind: &'static str,
+}
+
+fn command_result_output(result: &CommandResult) -> CommandResultOutput {
+    CommandResultOutput {
+        sequence: result.sequence().value(),
+        target_tick: result.target_tick().value(),
+        participant_id: result.participant_id().value().to_owned(),
+        status: command_result_status_output(result.status()),
+    }
+}
+
+fn command_result_status_output(status: CommandResultStatus) -> CommandResultStatusOutput {
+    match status {
+        CommandResultStatus::Accepted => CommandResultStatusOutput {
+            kind: "Accepted",
+            reason: None,
+        },
+        CommandResultStatus::Rejected { reason } => CommandResultStatusOutput {
+            kind: "Rejected",
+            reason: Some(command_rejection_reason_name(reason)),
+        },
+    }
+}
+
+fn command_rejection_reason_name(reason: CommandRejectionReason) -> &'static str {
+    match reason {
+        CommandRejectionReason::WrongTargetTick => "WrongTargetTick",
+        CommandRejectionReason::UnknownParticipant => "UnknownParticipant",
+        CommandRejectionReason::UnknownGroup => "UnknownGroup",
+        CommandRejectionReason::GroupNotControlledByParticipant => {
+            "GroupNotControlledByParticipant"
+        }
+        CommandRejectionReason::DuplicateCommandSequence => "DuplicateCommandSequence",
+    }
+}
+
+fn gameplay_event_output(event: &GameplayEvent) -> GameplayEventOutput {
+    match event {
+        GameplayEvent::GroupOrderAssigned(event) => GameplayEventOutput {
+            kind: "GroupOrderAssigned",
+            tick: event.tick(),
+            ordinal: event.ordinal().value(),
+            group_id: event.group_id().value().to_owned(),
+            participant_id: event.participant_id().value().to_owned(),
+            order: group_order_output(event.order()),
+        },
+    }
+}
+
+fn group_order_output(order: GroupOrder) -> GroupOrderOutput {
+    match order {
+        GroupOrder::HoldPosition => GroupOrderOutput {
+            kind: "HoldPosition",
+        },
+    }
 }
 
 fn trace_output_records(trace: &ExecutionTrace) -> Vec<TraceRecordOutput> {

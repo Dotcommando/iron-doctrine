@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 2,
+  "match": {
+    "matchId": "match-invalid-roster-001",
+    "tickRateHz": 20,
+    "seed": 123456,
+    "teams": [
+      {
+        "teamId": "team-blue"
+      }
+    ],
+    "participants": [
+      {
+        "participantId": "participant-blue-1",
+        "teamId": "team-missing"
+      }
+    ],
+    "groups": []
+  },
+  "commands": [],
+  "runTicks": 1,
+  "trace": false
+}

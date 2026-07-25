@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 2,
+  "match": {
+    "matchId": "match-group-order-001",
+    "tickRateHz": 20,
+    "seed": 123456,
+    "teams": [
+      {
+        "teamId": "team-blue"
+      },
+      {
+        "teamId": "team-red"
+      }
+    ],
+    "participants": [
+      {
+        "participantId": "participant-blue-1",
+        "teamId": "team-blue"
+      },
+      {
+        "participantId": "participant-red-1",
+        "teamId": "team-red"
+      }
+    ],
+    "groups": [
+      {
+        "groupId": "group-blue-alpha",
+        "controllerParticipantId": "participant-blue-1",
+        "robotIds": [
+          "robot-blue-001",
+          "robot-blue-002"
+        ]
+      },
+      {
+        "groupId": "group-red-alpha",
+        "controllerParticipantId": "participant-red-1",
+        "robotIds": [
+          "robot-red-001",
+          "robot-red-002"
+        ]
+      }
+    ]
+  },
+  "commands": [
+    {
+      "sequence": 1,
+      "targetTick": 0,
+      "participantId": "participant-blue-1",
+      "payload": {
+        "kind": "IssueGroupOrder",
+        "groupId": "group-blue-alpha",
+        "order": {
+          "kind": "HoldPosition"
+        }
+      }
+    }
+  ],
+  "runTicks": 1,
+  "trace": true
+}

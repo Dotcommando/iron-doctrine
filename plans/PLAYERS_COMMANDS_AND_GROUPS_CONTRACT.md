@@ -1000,7 +1000,7 @@ Add a focused test for multiple accepted commands targeting the same group if th
 
 ## Step 4 — Versioned Headless Scenario and CLI Result
 
-**Status:** Pending
+**Status:** Done
 
 ### Goal
 
@@ -1085,6 +1085,20 @@ Tests must verify meaningful fields, not whitespace or formatting.
 - Documentation contains the verified command and accepted JSON shapes.
 - All integration tests failed before implementation and now pass.
 - The full Rust quality gate passes.
+
+### Done
+
+- Updated the accepted headless scenario schema to version `2`.
+- Extended scenario parsing with explicit scheduled `commands` containing command envelopes and `IssueGroupOrder` / `HoldPosition` payloads.
+- Extended `sim-cli run` output with `matchId`, aggregated `commandResults`, and authoritative `gameplayEvents`.
+- Kept roster validation, command validation, ordering, intent production, event production, state mutation, hashing, and trace creation in `sim-core` / `sim-protocol`; `sim-cli` remains the filesystem/JSON/stdout/stderr adapter.
+- Added repository scenarios for a valid group order, foreign-group rejection, reordered command input, unknown participant command, and invalid roster data.
+- Added and verified CLI integration tests for accepted command output, authoritative event output, foreign-group rejection, reordered command determinism, invalid roster failure, stdout JSON cleanliness, and stderr diagnostics.
+- Updated `simulation/README.md` with schema version `2`, accepted command/event/result JSON shapes, and verified CLI scenario commands.
+- Reviewed the next two pending steps and found no required scope, naming, path, or scenario updates.
+- Ran host `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace --all-targets --all-features` successfully.
+- Ran `docker compose -f docker-compose.yml run --rm rust sh scripts/check.sh` successfully.
+- Ran `docker compose -f docker-compose.yml run --rm rust cargo run -p sim-cli -- run ../scenarios/group-order.json` successfully.
 
 ---
 

@@ -144,3 +144,5 @@ secrets/
 .local/
 
 .idea/
+
+.serena/

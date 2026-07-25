@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 2,
+  "match": {
+    "matchId": "match-unknown-participant-command-001",
+    "tickRateHz": 20,
+    "seed": 123456,
+    "teams": [
+      {
+        "teamId": "team-blue"
+      }
+    ],
+    "participants": [
+      {
+        "participantId": "participant-blue-1",
+        "teamId": "team-blue"
+      }
+    ],
+    "groups": [
+      {
+        "groupId": "group-blue-alpha",
+        "controllerParticipantId": "participant-blue-1",
+        "robotIds": [
+          "robot-blue-001"
+        ]
+      }
+    ]
+  },
+  "commands": [
+    {
+      "sequence": 1,
+      "targetTick": 0,
+      "participantId": "participant-unknown",
+      "payload": {
+        "kind": "IssueGroupOrder",
+        "groupId": "group-blue-alpha",
+        "order": {
+          "kind": "HoldPosition"
+        }
+      }
+    }
+  ],
+  "runTicks": 1,
+  "trace": true
+}
